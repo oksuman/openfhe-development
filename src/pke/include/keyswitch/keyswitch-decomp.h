@@ -45,13 +45,11 @@ public:
     void KeySwitchInPlace(Ciphertext<DCRTPoly>& ciphertext, const EvalKey<DCRTPoly> evalKey) const override;
 
     // Optional: Override if your method needs them - similar to HYBRID
-    /*
+
     Ciphertext<DCRTPoly> KeySwitchExt(ConstCiphertext<DCRTPoly> ciphertext, bool addFirst) const override;
-    
     Ciphertext<DCRTPoly> KeySwitchDown(ConstCiphertext<DCRTPoly> ciphertext) const override;
-    
     DCRTPoly KeySwitchDownFirstElement(ConstCiphertext<DCRTPoly> ciphertext) const override;
-    */
+
 
     /////////////////////////////////////////
     // CORE OPERATIONS
@@ -68,11 +66,11 @@ public:
         const std::shared_ptr<ParmType> paramsQl) const override;
 
     // Optional: Override if your method needs it - similar to HYBRID
-    /*
+
     std::shared_ptr<std::vector<DCRTPoly>> EvalFastKeySwitchCoreExt(
         const std::shared_ptr<std::vector<DCRTPoly>> digits, const EvalKey<DCRTPoly> evalKey,
         const std::shared_ptr<ParmType> paramsQl) const override;
-    */
+
 
     /////////////////////////////////////////
     // SERIALIZATION

@@ -46,6 +46,7 @@
 
 #include "keyswitch/keyswitch-hybrid.h"
 #include "keyswitch/keyswitch-bv.h"
+#include "keyswitch/keyswitch-decomp.h"
 #include "constants.h"
 #include "utils/exception.h"
 
@@ -74,6 +75,9 @@ public:
         }
         else if (ksTech == HYBRID) {
             m_KeySwitch = std::make_shared<KeySwitchHYBRID>();
+        }
+        else if (ksTech == DECOMP){
+            m_KeySwitch = std::make_shared<KeySwitchDECOMP>();
         }
         else
             OPENFHE_THROW("ksTech is invalid");

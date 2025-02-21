@@ -140,7 +140,7 @@ void CryptoParametersCKKSRNS::PrecomputeCRTTables(KeySwitchTechnique ksTech, Sca
         const auto p = GetPlaintextModulus();
         m_approxSF   = pow(2, p);
     }
-    if (m_ksTechnique == HYBRID) {
+    if (m_ksTechnique == HYBRID || m_ksTechnique == DECOMP) {
         const auto BarrettBase128Bit(BigInteger(1).LShiftEq(128));
         m_modqBarrettMu.resize(sizeQ);
         for (uint32_t i = 0; i < sizeQ; i++) {

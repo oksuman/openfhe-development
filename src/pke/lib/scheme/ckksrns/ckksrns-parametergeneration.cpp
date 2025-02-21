@@ -83,7 +83,7 @@ bool ParameterGenerationCKKSRNS::ParamsGenCKKSRNS(std::shared_ptr<CryptoParamete
         qBound++;
 
     // Estimate ciphertext modulus Q*P bound (in case of HYBRID P*Q)
-    if (ksTech == HYBRID) {
+    if (ksTech == HYBRID || ksTech == DECOMP) {
         auto hybridKSInfo = CryptoParametersRNS::EstimateLogP(numPartQ, firstModSize, scalingModSize, extraModSize,
                                                               numPrimes, auxBits, true);
         qBound += std::get<0>(hybridKSInfo);
@@ -262,7 +262,7 @@ bool ParameterGenerationCKKSRNS::ParamsGenCKKSRNS(std::shared_ptr<CryptoParamete
     // Validate the ring dimension found using estimated logQ(P) against actual logQ(P)
     if (stdLevel != HEStd_NotSet) {
         uint32_t logActualQ = 0;
-        if (ksTech == HYBRID) {
+        if (ksTech == HYBRID || ksTech == DECOMP) {
             logActualQ = cryptoParamsCKKSRNS->GetParamsQP()->GetModulus().GetMSB();
         }
         else {

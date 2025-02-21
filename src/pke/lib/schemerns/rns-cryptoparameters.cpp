@@ -69,7 +69,7 @@ void CryptoParametersRNS::PrecomputeCRTTables(KeySwitchTechnique ksTech, Scaling
     // Pre-compute CRT::FFT values for Q
     DiscreteFourierTransform::Initialize(n * 2, n / 2);
     ChineseRemainderTransformFTT<NativeVector>().PreCompute(rootsQ, 2 * n, moduliQ);
-    if (m_ksTechnique == HYBRID) {
+    if (m_ksTechnique == HYBRID || m_ksTechnique == DECOMP) {
         // numPartQ can not be zero as there is a division by numPartQ
         if (numPartQ == 0)
             OPENFHE_THROW("numPartQ is zero");
@@ -333,7 +333,7 @@ void CryptoParametersRNS::PrecomputeCRTTables(KeySwitchTechnique ksTech, Scaling
     // BFVrns and BGVrns : Multiparty Decryption : ExpandCRTBasis
     /////////////////////////////////////
     if (GetMultipartyMode() == NOISE_FLOODING_MULTIPARTY) {
-        // Pre-compute values [*(Q/q_i/q_0)^{-1}]_{q_i}
+        // Pre-compute values [*(Q/q_i/q_0)^{-1}]_{q_i} 
         BigInteger modulusQ = BigInteger(GetElementParams()->GetModulus()) / BigInteger(moduliQ[0]);
         m_multipartyQHatInvModq.resize(sizeQ - 1);
         m_multipartyQHatInvModqPrecon.resize(sizeQ - 1);
