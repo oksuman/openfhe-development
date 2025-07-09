@@ -85,7 +85,7 @@ enum KeySwitchTechnique {
     INVALID_KS_TECH = 0,
     BV,
     HYBRID,
-    DECOMP, // added
+    BATCHED, // added
 };
 
 enum EncryptionTechnique {

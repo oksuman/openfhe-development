@@ -300,6 +300,8 @@ KeySwitchTechnique convertToKeySwitchTechnique(const std::string& str) {
         return BV;
     else if (str == "HYBRID")
         return HYBRID;
+    else if (str == "BATCHED")
+        return BATCHED;
 
     std::string errMsg(std::string("Unknown KeySwitchTechnique ") + str);
     OPENFHE_THROW(errMsg);
@@ -310,6 +312,7 @@ KeySwitchTechnique convertToKeySwitchTechnique(uint32_t num) {
         // case INVALID_KS_TECH:
         case BV:
         case HYBRID:
+        case BATCHED:
             return ksTech;
         default:
             break;
@@ -325,6 +328,9 @@ std::ostream& operator<<(std::ostream& s, KeySwitchTechnique t) {
             break;
         case HYBRID:
             s << "HYBRID";
+            break;
+        case BATCHED:
+            s << "BATCHED";
             break;
         default:
             s << "UNKNOWN";

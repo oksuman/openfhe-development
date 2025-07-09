@@ -69,7 +69,7 @@ void CryptoParametersRNS::PrecomputeCRTTables(KeySwitchTechnique ksTech, Scaling
     // Pre-compute CRT::FFT values for Q
     DiscreteFourierTransform::Initialize(n * 2, n / 2);
     ChineseRemainderTransformFTT<NativeVector>().PreCompute(rootsQ, 2 * n, moduliQ);
-    if (m_ksTechnique == HYBRID || m_ksTechnique == DECOMP) {
+    if (m_ksTechnique == HYBRID || m_ksTechnique == BATCHED) {
         // numPartQ can not be zero as there is a division by numPartQ
         if (numPartQ == 0)
             OPENFHE_THROW("numPartQ is zero");

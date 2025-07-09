@@ -1,8 +1,5 @@
-/**
- * [Description and references]
- */
-#ifndef LBCRYPTO_CRYPTO_KEYSWITCH_DECOMP_H
-#define LBCRYPTO_CRYPTO_KEYSWITCH_DECOMP_H
+#ifndef LBCRYPTO_CRYPTO_KEYSWITCH_BATCHED_H
+#define LBCRYPTO_CRYPTO_KEYSWITCH_BATCHED_H
 
 #include "keyswitch/keyswitch-rns.h"
 #include "schemebase/rlwe-cryptoparameters.h"
@@ -18,19 +15,19 @@
 namespace lbcrypto {
 
 /**
- * @brief Implements DECOMP key switching 
+ * @brief Implements BATCHED key switching 
  * [Description of key switching method]
  */
-class KeySwitchDECOMP : public KeySwitchRNS {
+class KeySwitchBATCHED : public KeySwitchRNS {
     using ParmType = typename DCRTPoly::Params;
     using DugType  = typename DCRTPoly::DugType;
     using DggType  = typename DCRTPoly::DggType;
     using TugType  = typename DCRTPoly::TugType;
 
 public:
-    KeySwitchDECOMP(){};
+    KeySwitchBATCHED(){};
 
-    virtual ~KeySwitchDECOMP(){};
+    virtual ~KeySwitchBATCHED(){};
 
     EvalKey<DCRTPoly> KeySwitchGenInternal(const PrivateKey<DCRTPoly> oldPrivateKey,
                                            const PrivateKey<DCRTPoly> newPrivateKey) const override;
@@ -87,7 +84,7 @@ public:
     }
 
     std::string SerializedObjectName() const override {
-        return "KeySwitchDECOMP";
+        return "KeySwitchBATCHED";
     }
 };
 
