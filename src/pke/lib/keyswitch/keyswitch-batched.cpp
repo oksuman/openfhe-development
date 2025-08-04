@@ -12,6 +12,7 @@
 #include "scheme/ckksrns/ckksrns-cryptoparameters.h"
 #include "cryptocontext.h"
 #include <iostream>
+#include <chrono>
 
 namespace lbcrypto {
 
@@ -549,7 +550,16 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchBATCHED::KeySwitchCore(const DCR
         OPENFHE_THROW("cryptoParams from evalKey is nullptr");
     }
     
+    // === 시간 측정 시작 ===
+    auto start = std::chrono::high_resolution_clock::now();
+
     auto digits = EvalKeySwitchPrecomputeCore(a, cryptoParams);
+
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration_us = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+    std::cout << "[TIMING] Digit decomposition took " << duration_us / 1000.0 << " ms" << std::endl;
+    // === 시간 측정 끝 ===
+
     if(digits == nullptr) {
         std::cout << "Error: EvalKeySwitchPrecomputeCore returned nullptr" << std::endl;
         OPENFHE_THROW("EvalKeySwitchPrecomputeCore returned nullptr");
@@ -772,7 +782,15 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchBATCHED::EvalFastKeySwitchCore(
         OPENFHE_THROW("cryptoParams is nullptr");
     }
 
+    // --- EvalFastKeySwitchCoreExt 시간 측정 ---
+    auto start_ks = std::chrono::high_resolution_clock::now();
     std::shared_ptr<std::vector<DCRTPoly>> cTilda = EvalFastKeySwitchCoreExt(digits, evalKey, paramsQl);
+    auto end_ks = std::chrono::high_resolution_clock::now();
+
+    auto duration_ks = std::chrono::duration_cast<std::chrono::microseconds>(end_ks - start_ks).count();
+    std::cout << "[TIMING] EvalFastKeySwitchCoreExt took " << duration_ks / 1000.0 << " ms" << std::endl;
+
+
     if(cTilda == nullptr) {
         std::cout << "Error: EvalFastKeySwitchCoreExt returned nullptr" << std::endl;
         OPENFHE_THROW("EvalFastKeySwitchCoreExt returned nullptr");
@@ -785,6 +803,8 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchBATCHED::EvalFastKeySwitchCore(
 
     PlaintextModulus t = (cryptoParams->GetNoiseScale() == 1) ? 0 : cryptoParams->GetPlaintextModulus();
 
+    // --- ApproxModDown 시간 측정 ---
+    auto start_moddown = std::chrono::high_resolution_clock::now();
     DCRTPoly ct0 = (*cTilda)[0].ApproxModDown(paramsQl, cryptoParams->GetParamsP(), cryptoParams->GetPInvModq(),
                                             cryptoParams->GetPInvModqPrecon(), cryptoParams->GetPHatInvModp(),
                                             cryptoParams->GetPHatInvModpPrecon(), cryptoParams->GetPHatModq(),
@@ -796,7 +816,10 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchBATCHED::EvalFastKeySwitchCore(
                                             cryptoParams->GetPHatInvModpPrecon(), cryptoParams->GetPHatModq(),
                                             cryptoParams->GetModqBarrettMu(), cryptoParams->GettInvModp(),
                                             cryptoParams->GettInvModpPrecon(), t, cryptoParams->GettModqPrecon());
-    //std::cout << "Debug: EvalFastKeySwitchCore completed" << std::endl;
+
+    auto end_moddown = std::chrono::high_resolution_clock::now();
+    auto duration_moddown = std::chrono::duration_cast<std::chrono::microseconds>(end_moddown - start_moddown).count();
+    std::cout << "[TIMING] ApproxModDown (both elements) took " << duration_moddown / 1000.0 << " ms" << std::endl;
 
     return std::make_shared<std::vector<DCRTPoly>>(std::initializer_list<DCRTPoly>{std::move(ct0), std::move(ct1)});
 }

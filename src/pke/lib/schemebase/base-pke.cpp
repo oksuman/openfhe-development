@@ -99,15 +99,21 @@ Ciphertext<Element> PKEBase<Element>::Encrypt(Element plaintext, const PrivateKe
     Ciphertext<Element> ciphertext           = std::make_shared<CiphertextImpl<Element>>(privateKey);
     std::shared_ptr<std::vector<Element>> ba = EncryptZeroCore(privateKey, nullptr);
     (*ba)[0] += plaintext;
-
+    
     ciphertext->SetElements({std::move((*ba)[0]), std::move((*ba)[1])});
     ciphertext->SetNoiseScaleDeg(1);
+    
+    // === Key dependency initialization ===
+    auto& keyDeps = ciphertext->GetElementKeyIndexVector();
+    keyDeps.resize(2);
+    keyDeps[0] = CiphertextImpl<Element>::KEY_DEP_CONSTANT;
+    keyDeps[1] = CiphertextImpl<Element>::KEY_DEP_S;
 
     return ciphertext;
 }
 
 template <class Element>
-Ciphertext<Element> PKEBase<Element>::Encrypt(Element plaintext, const PublicKey<Element> publicKey) const {
+Ciphertext<Element> PKEBase<Element>::Encrypt(Element plaintext, const PublicKey<Element> publicKey) const {;
     Ciphertext<Element> ciphertext           = std::make_shared<CiphertextImpl<Element>>(publicKey);
     std::shared_ptr<std::vector<Element>> ba = EncryptZeroCore(publicKey, nullptr);
 
@@ -115,6 +121,12 @@ Ciphertext<Element> PKEBase<Element>::Encrypt(Element plaintext, const PublicKey
 
     ciphertext->SetElements({std::move((*ba)[0]), std::move((*ba)[1])});
     ciphertext->SetNoiseScaleDeg(1);
+
+    // === Key dependency initialization ===
+    auto& keyDeps = ciphertext->GetElementKeyIndexVector();
+    keyDeps.resize(2);
+    keyDeps[0] = CiphertextImpl<Element>::KEY_DEP_CONSTANT;
+    keyDeps[1] = CiphertextImpl<Element>::KEY_DEP_S;
 
     return ciphertext;
 }

@@ -2128,9 +2128,27 @@ public:
    */
     Ciphertext<Element> EvalRotate(ConstCiphertext<Element> ciphertext, int32_t index) const {
         ValidateCiphertext(ciphertext);
-
+   
         auto evalKeyMap = CryptoContextImpl<Element>::GetEvalAutomorphismKeyMap(ciphertext->GetKeyTag());
         return GetScheme()->EvalAtIndex(ciphertext, index, evalKeyMap);
+    }
+
+    Ciphertext<Element> EvalLazyRotate(ConstCiphertext<Element> ciphertext, int32_t index) const {
+        ValidateCiphertext(ciphertext);
+
+        return GetScheme()->EvalLazyAtIndex(ciphertext, index);
+    }
+    // Ciphertext<Element> EvalLazyRotate(ConstCiphertext<Element> ciphertext, int32_t index) const {
+    //     ValidateCiphertext(ciphertext);
+   
+    //     auto evalKeyMap = CryptoContextImpl<Element>::GetEvalAutomorphismKeyMap(ciphertext->GetKeyTag());
+    //     return GetScheme()->EvalLazyAtIndex(ciphertext, index, evalKeyMap);
+    // }
+
+    Ciphertext<Element> EvalBatchedKS(ConstCiphertext<Element> ciphertext) const {
+        ValidateCiphertext(ciphertext);
+   
+        return GetScheme()->EvalBatchedKS(ciphertext);
     }
 
     /**
@@ -2267,6 +2285,8 @@ public:
    */
     void EvalAtIndexKeyGen(const PrivateKey<Element> privateKey, const std::vector<int32_t>& indexList,
                            const PublicKey<Element> publicKey = nullptr);
+    void EvalLazyAtIndexKeyGen(const PrivateKey<Element> privateKey, const std::vector<int32_t>& indexList,
+                           const PublicKey<Element> publicKey = nullptr);
 
     // [[deprecated(
     //     "Use EvalAtIndexKeyGen(const PrivateKey<Element> privateKey, const std::vector<int32_t>& indexList) instead.")]] void
@@ -2288,6 +2308,11 @@ public:
     void EvalRotateKeyGen(const PrivateKey<Element> privateKey, const std::vector<int32_t>& indexList,
                           const PublicKey<Element> publicKey = nullptr) {
         EvalAtIndexKeyGen(privateKey, indexList, publicKey);
+    };
+
+    void EvalLazyRotateKeyGen(const PrivateKey<Element> privateKey, const std::vector<int32_t>& indexList,
+                          const PublicKey<Element> publicKey = nullptr) {
+        EvalLazyAtIndexKeyGen(privateKey, indexList, publicKey);
     };
     // [[deprecated(
     //     "Use EvalRotateKeyGen(const PrivateKey<Element> privateKey, const std::vector<int32_t>& indexList) instead.")]] void

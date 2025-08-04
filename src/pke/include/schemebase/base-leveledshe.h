@@ -548,7 +548,9 @@ public:
    */
     virtual std::shared_ptr<std::map<usint, EvalKey<Element>>> EvalAutomorphismKeyGen(
         const PrivateKey<Element> privateKey, const std::vector<usint>& indexList) const;
-
+        
+    virtual std::shared_ptr<std::map<usint, EvalKey<Element>>> EvalLazyAutomorphismKeyGen(
+        const PrivateKey<Element> privateKey, const std::vector<usint>& indexList) const;
     /**
    * Virtual function to generate all isomorphism keys for a given private key
    *
@@ -575,6 +577,12 @@ public:
     virtual Ciphertext<Element> EvalAutomorphism(ConstCiphertext<Element> ciphertext, usint i,
                                                  const std::map<usint, EvalKey<Element>>& evalKeyMap,
                                                  CALLER_INFO_ARGS_HDR) const;
+
+    virtual Ciphertext<Element> EvalLazyAutomorphism(ConstCiphertext<Element> ciphertext, usint i,
+                                                 CALLER_INFO_ARGS_HDR) const;
+    // virtual Ciphertext<Element> EvalLazyAutomorphism(ConstCiphertext<Element> ciphertext, usint i,
+    //                                              const std::map<usint, EvalKey<Element>>& evalKeyMap,
+    //                                              CALLER_INFO_ARGS_HDR) const;
 
     /**
    * Virtual function for the automorphism and key switching step of
@@ -620,6 +628,10 @@ public:
         const PublicKey<Element> publicKey, const PrivateKey<Element> privateKey,
         const std::vector<int32_t>& indexList) const;
 
+    virtual std::shared_ptr<std::map<usint, EvalKey<Element>>> EvalLazyAtIndexKeyGen(
+        const PublicKey<Element> publicKey, const PrivateKey<Element> privateKey,
+        const std::vector<int32_t>& indexList) const;
+
     /**
    * Moves i-th slot to slot 0
    *
@@ -631,6 +643,9 @@ public:
    */
     virtual Ciphertext<Element> EvalAtIndex(ConstCiphertext<Element> ciphertext, int32_t index,
                                             const std::map<usint, EvalKey<Element>>& evalKeyMap) const;
+    virtual Ciphertext<Element> EvalLazyAtIndex(ConstCiphertext<Element> ciphertext, int32_t index) const;
+
+    virtual Ciphertext<Element> EvalBatchedKS(ConstCiphertext<Element> ciphertext) const;
 
     virtual usint FindAutomorphismIndex(usint index, usint m) const {
         OPENFHE_THROW("FindAutomorphismIndex is not supported for this scheme");

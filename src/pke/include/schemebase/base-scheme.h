@@ -241,6 +241,8 @@ public:
     }
 
     virtual Ciphertext<Element> Encrypt(const Element& plaintext, const PublicKey<Element> publicKey) const {
+        std::cout << "public key enc" << std::endl;
+        
         VerifyPKEEnabled(__func__);
         //      if (!plaintext)
         //        OPENFHE_THROW( "Input plaintext is nullptr");
@@ -955,6 +957,10 @@ public:
         const PublicKey<Element> publicKey, const PrivateKey<Element> privateKey,
         const std::vector<int32_t>& indexList) const;
 
+    virtual std::shared_ptr<std::map<uint32_t, EvalKey<Element>>> EvalLazyAtIndexKeyGen(
+        const PublicKey<Element> publicKey, const PrivateKey<Element> privateKey,
+        const std::vector<int32_t>& indexList) const;
+
     virtual Ciphertext<Element> EvalAtIndex(ConstCiphertext<Element> ciphertext, uint32_t i,
                                             const std::map<uint32_t, EvalKey<Element>>& evalKeyMap) const {
         VerifyLeveledSHEEnabled(__func__);
@@ -963,6 +969,20 @@ public:
         if (!evalKeyMap.size())
             OPENFHE_THROW("Input evaluation key map is empty");
         return m_LeveledSHE->EvalAtIndex(ciphertext, i, evalKeyMap);
+    }
+
+    virtual Ciphertext<Element> EvalLazyAtIndex(ConstCiphertext<Element> ciphertext, uint32_t i) const {
+        VerifyLeveledSHEEnabled(__func__);
+        if (!ciphertext)
+            OPENFHE_THROW("Input ciphertext is nullptr");
+        return m_LeveledSHE->EvalLazyAtIndex(ciphertext, i);
+    }
+
+    Ciphertext<Element> EvalBatchedKS(ConstCiphertext<Element> ciphertext) const {
+        VerifyLeveledSHEEnabled(__func__);
+        if (!ciphertext)
+            OPENFHE_THROW("Input ciphertext is nullptr");
+        return m_LeveledSHE->EvalBatchedKS(ciphertext);
     }
 
     virtual uint32_t FindAutomorphismIndex(uint32_t index, uint32_t m) {

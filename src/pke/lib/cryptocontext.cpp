@@ -278,6 +278,19 @@ void CryptoContextImpl<Element>::EvalAtIndexKeyGen(const PrivateKey<Element> pri
 }
 
 template <typename Element>
+void CryptoContextImpl<Element>::EvalLazyAtIndexKeyGen(const PrivateKey<Element> privateKey,
+                                                   const std::vector<int32_t>& indexList,
+                                                   const PublicKey<Element> publicKey) {
+    ValidateKey(privateKey);
+    if (publicKey != nullptr && privateKey->GetKeyTag() != publicKey->GetKeyTag()) {
+        OPENFHE_THROW("Public key passed to EvalAtIndexKeyGen does not match private key");
+    }
+
+    auto evalKeys = GetScheme()->EvalLazyAtIndexKeyGen(publicKey, privateKey, indexList);
+    CryptoContextImpl<Element>::InsertEvalAutomorphismKey(evalKeys, privateKey->GetKeyTag());
+}
+
+template <typename Element>
 void CryptoContextImpl<Element>::ClearEvalAutomorphismKeys() {
     CryptoContextImpl<Element>::s_evalAutomorphismKeyMap.clear();
 }

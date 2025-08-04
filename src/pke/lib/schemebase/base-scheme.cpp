@@ -103,6 +103,20 @@ std::shared_ptr<std::map<usint, EvalKey<Element>>> SchemeBase<Element>::EvalAtIn
 }
 
 template <typename Element>
+std::shared_ptr<std::map<usint, EvalKey<Element>>> SchemeBase<Element>::EvalLazyAtIndexKeyGen(
+    const PublicKey<Element> publicKey, const PrivateKey<Element> privateKey,
+    const std::vector<int32_t>& indexList) const {
+    VerifyLeveledSHEEnabled(__func__);
+    if (!privateKey)
+        OPENFHE_THROW("Input private key is nullptr");
+
+    auto evalKeyMap = m_LeveledSHE->EvalLazyAtIndexKeyGen(publicKey, privateKey, indexList);
+    for (auto& key : *evalKeyMap)
+        key.second->SetKeyTag(privateKey->GetKeyTag());
+    return evalKeyMap;
+}
+
+template <typename Element>
 Ciphertext<Element> SchemeBase<Element>::ComposedEvalMult(ConstCiphertext<Element> ciphertext1,
                                                           ConstCiphertext<Element> ciphertext2,
                                                           const EvalKey<Element> evalKey) const {

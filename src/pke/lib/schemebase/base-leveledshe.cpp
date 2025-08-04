@@ -417,6 +417,49 @@ std::shared_ptr<std::map<uint32_t, EvalKey<Element>>> LeveledSHEBase<Element>::E
     return evalKeys;
 }
 
+
+template <class Element>
+std::shared_ptr<std::map<uint32_t, EvalKey<Element>>> LeveledSHEBase<Element>::EvalLazyAutomorphismKeyGen(
+    const PrivateKey<Element> privateKey, const std::vector<uint32_t>& indexList) const {
+    // we already have checks on higher level?
+    //  auto it = std::find(indexList.begin(), indexList.end(), 2 * n - 1);
+    //  if (it != indexList.end())
+    //    OPENFHE_THROW("conjugation is disabled");
+
+    const auto cc = privateKey->GetCryptoContext();
+    auto algo     = cc->GetScheme();
+
+    const Element& s = privateKey->GetPrivateElement();
+    uint32_t N       = s.GetRingDimension();
+
+    // we already have checks on higher level?
+    //  if (indexList.size() > N - 1)
+    //    OPENFHE_THROW("size exceeds the ring dimension");
+
+    // create and initialize the key map (key is a value from indexList, EvalKey is nullptr). in this case
+    // we should be able to assign values to the map without using "omp critical" as all evalKeys' elements would
+    // have already been created
+    auto evalKeys = std::make_shared<std::map<uint32_t, EvalKey<Element>>>();
+    for (auto indx : indexList) {
+        (*evalKeys)[indx];
+    }
+    size_t sz = indexList.size();
+#pragma omp parallel for if (sz >= 4)
+    for (size_t i = 0; i < sz; ++i) {
+        PrivateKey<Element> privateKeyPermuted = std::make_shared<PrivateKeyImpl<Element>>(cc);
+
+        uint32_t index = NativeInteger(indexList[i]).ConvertToInt();
+        std::vector<uint32_t> vec(N);
+        PrecomputeAutoMap(N, index, &vec);
+
+        privateKeyPermuted->SetPrivateElement(s.AutomorphismTransform(index, vec));
+        (*evalKeys)[indexList[i]] = algo->KeySwitchGen(privateKeyPermuted, privateKey);
+        // old: s, new: permuted s 
+    }
+
+    return evalKeys;
+}
+
 template <class Element>
 Ciphertext<Element> LeveledSHEBase<Element>::EvalAutomorphism(ConstCiphertext<Element> ciphertext, usint i,
                                                               const std::map<usint, EvalKey<Element>>& evalKeyMap,
@@ -467,6 +510,117 @@ Ciphertext<Element> LeveledSHEBase<Element>::EvalAutomorphism(ConstCiphertext<El
 
     return result;
 }
+
+
+// template <class Element>
+// Ciphertext<Element> LeveledSHEBase<Element>::EvalLazyAutomorphism(ConstCiphertext<Element> ciphertext, usint i,
+//                                                               const std::map<usint, EvalKey<Element>>& evalKeyMap,
+//                                                               CALLER_INFO_ARGS_CPP) const {
+                                                    
+
+//     // this operation can be performed on 2-element ciphertexts only
+//     if (ciphertext->NumberCiphertextElements() != 2) {
+//         OPENFHE_THROW("Ciphertext should be relinearized before.");
+//     }
+
+//     // verify if the key i exists in the evalKeyMap
+//     auto evalKeyIterator = evalKeyMap.find(i);
+//     if (evalKeyIterator == evalKeyMap.end()) {
+//         OPENFHE_THROW("EvalKey for index [" + std::to_string(i) + "] is not found." + CALLER_INFO);
+//     }
+//     const std::vector<Element>& cv = ciphertext->GetElements();
+
+//     // we already have checks on higher level?
+//     //  if (cv.size() < 2) {
+//     //    std::string errorMsg(
+//     //        std::string("Insufficient number of elements in ciphertext: ") +
+//     //        std::to_string(cv.size()) + CALLER_INFO);
+//     //    OPENFHE_THROW( errorMsg);
+//     //  }
+
+//     usint N = cv[0].GetRingDimension();
+
+//     //  if (i == 2 * N - 1)
+//     //    OPENFHE_THROW(
+//     //                   "conjugation is disabled " + CALLER_INFO);
+
+//     //  if (i > 2 * N - 1)
+//     //    OPENFHE_THROW(
+//     //        "automorphism indices higher than 2*n are not allowed " + CALLER_INFO);
+
+//     std::vector<usint> vec(N);
+//     PrecomputeAutoMap(N, i, &vec);
+
+//     auto algo = ciphertext->GetCryptoContext()->GetScheme();
+
+//     Ciphertext<Element> result = ciphertext->Clone();
+
+//     std::vector<Element>& rcv = result->GetElements();
+//     rcv[0] = rcv[0].AutomorphismTransform(i, vec);
+//     rcv[1] = rcv[1].AutomorphismTransform(i, vec);
+    
+//     std::cout << "automorphism index: " << i << std::endl;
+
+//     result->SetElements(rcv);
+//     algo->KeySwitchInPlace(result, evalKeyIterator->second);
+
+//     return result;
+// }
+
+template <class Element>
+Ciphertext<Element> LeveledSHEBase<Element>::EvalLazyAutomorphism(
+    ConstCiphertext<Element> ciphertext, usint i,
+    CALLER_INFO_ARGS_CPP) const {
+
+    const std::vector<Element>& cv = ciphertext->GetElements();
+    usint N = cv[0].GetRingDimension();
+
+    std::vector<usint> vec(N);
+    PrecomputeAutoMap(N, i, &vec);
+
+    auto algo = ciphertext->GetCryptoContext()->GetScheme();
+
+    Ciphertext<Element> result = ciphertext->Clone();
+    std::vector<Element>& rcv = result->GetElements();
+
+    for (size_t idx = 0; idx < rcv.size(); ++idx) {
+        rcv[idx] = rcv[idx].AutomorphismTransform(i, vec);
+    }
+    result->SetElements(rcv);
+
+    auto& keyIndices = result->GetElementKeyIndexVector();
+    const auto& originalKeyIndices = ciphertext->GetElementKeyIndexVector();
+
+    keyIndices.resize(rcv.size());
+
+    // ---------- Key Dependency Update with ModMulFast ----------
+    NativeInteger modulus(2 * N);
+    NativeInteger mu = modulus.ComputeMu();
+    NativeInteger iNative(i);
+
+    for (size_t idx = 0; idx < rcv.size(); ++idx) {
+        int32_t oldDep = originalKeyIndices[idx];
+        std::cout << "idx: " << idx << std::endl;
+        std::cout << "oldDep: " << oldDep << std::endl;
+        
+        if (idx == 0 || oldDep == CiphertextImpl<Element>::KEY_DEP_CONSTANT) {
+            keyIndices[idx] = CiphertextImpl<Element>::KEY_DEP_CONSTANT;
+        }
+        else if (oldDep == CiphertextImpl<Element>::KEY_DEP_S) {
+            // s -> gᵢ(s)
+            keyIndices[idx] = i;
+        }
+        else {
+            NativeInteger oldNative(oldDep);
+            NativeInteger newDep = oldNative.ModMulFast(iNative, modulus, mu);
+            keyIndices[idx] = newDep.ConvertToInt();
+        }
+        std::cout << "rotation index: " << i << std::endl;
+        std::cout << "newDep: " << keyIndices[idx] << std::endl;
+    }
+    return result;
+}
+
 
 template <class Element>
 std::shared_ptr<std::vector<Element>> LeveledSHEBase<Element>::EvalFastRotationPrecompute(
@@ -538,6 +692,22 @@ std::shared_ptr<std::map<usint, EvalKey<Element>>> LeveledSHEBase<Element>::Eval
 }
 
 template <class Element>
+std::shared_ptr<std::map<usint, EvalKey<Element>>> LeveledSHEBase<Element>::EvalLazyAtIndexKeyGen(
+    const PublicKey<Element> publicKey, const PrivateKey<Element> privateKey,
+    const std::vector<int32_t>& indexList) const {
+    const auto cc = privateKey->GetCryptoContext();
+
+    usint M = privateKey->GetCryptoParameters()->GetElementParams()->GetCyclotomicOrder();
+
+    std::vector<uint32_t> autoIndices(indexList.size());
+    for (size_t i = 0; i < indexList.size(); i++) {
+        autoIndices[i] = FindAutomorphismIndex(indexList[i], M);
+    }
+
+    return EvalLazyAutomorphismKeyGen(privateKey, autoIndices);
+}
+
+template <class Element>
 Ciphertext<Element> LeveledSHEBase<Element>::EvalAtIndex(ConstCiphertext<Element> ciphertext, int32_t index,
                                                          const std::map<usint, EvalKey<Element>>& evalKeyMap) const {
     const auto cc = ciphertext->GetCryptoContext();
@@ -547,6 +717,78 @@ Ciphertext<Element> LeveledSHEBase<Element>::EvalAtIndex(ConstCiphertext<Element
     uint32_t autoIndex = FindAutomorphismIndex(index, M);
 
     return EvalAutomorphism(ciphertext, autoIndex, evalKeyMap);
+}
+
+template <class Element>
+Ciphertext<Element> LeveledSHEBase<Element>::EvalLazyAtIndex(ConstCiphertext<Element> ciphertext, int32_t index) const {
+    
+    const auto cc = ciphertext->GetCryptoContext();
+
+    usint M = ciphertext->GetCryptoParameters()->GetElementParams()->GetCyclotomicOrder();
+
+    uint32_t autoIndex = FindAutomorphismIndex(index, M);
+
+    return EvalLazyAutomorphism(ciphertext, autoIndex);
+}
+
+// template <class Element>
+// Ciphertext<Element> LeveledSHEBase<Element>::EvalLazyAtIndex(ConstCiphertext<Element> ciphertext, int32_t index,
+//                                                          const std::map<usint, EvalKey<Element>>& evalKeyMap) const {
+    
+//     const auto cc = ciphertext->GetCryptoContext();
+
+//     usint M = ciphertext->GetCryptoParameters()->GetElementParams()->GetCyclotomicOrder();
+
+//     uint32_t autoIndex = FindAutomorphismIndex(index, M);
+
+//     return EvalLazyAutomorphism(ciphertext, autoIndex, evalKeyMap);
+// }
+
+// TODO : Key switching 구조 수정 
+template <class Element>
+Ciphertext<Element> LeveledSHEBase<Element>::EvalBatchedKS(ConstCiphertext<Element> ciphertext) const {
+    std::cout << "batched key switching called" << std::endl;
+    if (ciphertext->GetElements().size() != 2) {
+        OPENFHE_THROW("EvalBatchedKS currently only supports ciphertexts with 2 elements.");
+    }
+
+    const auto cc = ciphertext->GetCryptoContext();
+    auto evalKeyMap = cc->GetEvalAutomorphismKeyMap(ciphertext->GetKeyTag());
+    auto algo = cc->GetScheme();
+
+    Ciphertext<Element> result = ciphertext->Clone();
+
+    const auto& keyIndices = ciphertext->GetElementKeyIndexVector();
+    if (keyIndices.size() != 2) {
+        OPENFHE_THROW("Expected key dependency vector of size 2.");
+    }
+
+    // Element 1의 key dependency가 switching 대상
+    int32_t keyDep = keyIndices[1];
+
+    if (keyDep == CiphertextImpl<Element>::KEY_DEP_CONSTANT || 
+        keyDep == CiphertextImpl<Element>::KEY_DEP_S) {
+        // No switching needed
+        return result;
+    }
+
+    auto evalKeyIter = evalKeyMap.find(keyDep);
+    std::cout << "goal: key switching for automorphism index " << keyDep << std::endl;
+    if (evalKeyIter == evalKeyMap.end()) {
+        OPENFHE_THROW("EvalKey for index [" + std::to_string(keyDep) + "] not found.");
+    }
+
+    // Perform key switching
+    algo->KeySwitchInPlace(result, evalKeyIter->second);
+
+    // Key dependency update
+    auto& resultKeyIndices = result->GetElementKeyIndexVector();
+    resultKeyIndices.resize(2);
+    resultKeyIndices[0] = CiphertextImpl<Element>::KEY_DEP_CONSTANT;
+    resultKeyIndices[1] = CiphertextImpl<Element>::KEY_DEP_S; 
+
+
+    return result;
 }
 
 /////////////////////////////////////////

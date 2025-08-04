@@ -346,7 +346,7 @@ DCRTPolyImpl<VecType> DCRTPolyImpl<VecType>::AutomorphismTransform(uint32_t i) c
 template <typename VecType>
 DCRTPolyImpl<VecType> DCRTPolyImpl<VecType>::AutomorphismTransform(uint32_t i, const std::vector<uint32_t>& vec) const {
     DCRTPolyImpl<VecType> result;
-    result.m_params = m_params;
+    result.m_params = m_params; 
     result.m_format = m_format;
     result.m_vectors.reserve(m_vectors.size());
     for (const auto& v : m_vectors)

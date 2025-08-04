@@ -57,9 +57,13 @@ namespace lbcrypto {
  *
  * @tparam Element a ring element.
  */
+
 template <class Element>
 class CiphertextImpl : public CryptoObject<Element> {
 public:
+    // 🔧 Key dependency constants
+    static constexpr int32_t KEY_DEP_CONSTANT = 0;  // No secret key (e.g., constant term, s^0)
+    static constexpr int32_t KEY_DEP_S        = 1;   // Directly tied to secret key s (s^1)
     /**
    * Default constructor
    */
@@ -87,6 +91,7 @@ public:
    */
     CiphertextImpl(const CiphertextImpl<Element>& ciphertext) : CryptoObject<Element>(ciphertext) {
         m_elements         = ciphertext.m_elements;
+        m_elementKeyIndices   = ciphertext.m_elementKeyIndices;  // 🔧 copy key index
         m_noiseScaleDeg    = ciphertext.m_noiseScaleDeg;
         m_level            = ciphertext.m_level;
         m_hopslevel        = ciphertext.m_hopslevel;
@@ -99,6 +104,7 @@ public:
 
     explicit CiphertextImpl(Ciphertext<Element> ciphertext) : CryptoObject<Element>(*ciphertext) {
         m_elements         = ciphertext->m_elements;
+        m_elementKeyIndices   = ciphertext->m_elementKeyIndices;  // 🔧 copy key index
         m_noiseScaleDeg    = ciphertext->m_noiseScaleDeg;
         m_level            = ciphertext->m_level;
         m_hopslevel        = ciphertext->m_hopslevel;
@@ -114,6 +120,7 @@ public:
    */
     CiphertextImpl(CiphertextImpl<Element>&& ciphertext) : CryptoObject<Element>(ciphertext) {
         m_elements         = std::move(ciphertext.m_elements);
+        m_elementKeyIndices   = std::move(ciphertext.m_elementKeyIndices);  // 🔧 move key index map
         m_noiseScaleDeg    = std::move(ciphertext.m_noiseScaleDeg);
         m_level            = std::move(ciphertext.m_level);
         m_hopslevel        = std::move(ciphertext.m_hopslevel);
@@ -126,6 +133,7 @@ public:
 
     explicit CiphertextImpl(Ciphertext<Element>&& ciphertext) : CryptoObject<Element>(*ciphertext) {
         m_elements         = std::move(ciphertext->m_elements);
+        m_elementKeyIndices   = std::move(ciphertext->m_elementKeyIndices);  // 🔧 move key index map
         m_noiseScaleDeg    = std::move(ciphertext->m_noiseScaleDeg);
         m_level            = std::move(ciphertext->m_level);
         m_hopslevel        = std::move(ciphertext->m_hopslevel);
@@ -184,6 +192,7 @@ public:
         if (this != &rhs) {
             CryptoObject<Element>::operator=(rhs);
             this->m_elements         = rhs.m_elements;
+            this->m_elementKeyIndices= rhs.m_elementKeyIndices;  // 🔧 assign key index map
             this->m_noiseScaleDeg    = rhs.m_noiseScaleDeg;
             this->m_level            = rhs.m_level;
             this->m_hopslevel        = rhs.m_hopslevel;
@@ -205,8 +214,9 @@ public:
    */
     CiphertextImpl<Element>& operator=(CiphertextImpl<Element>&& rhs) {
         if (this != &rhs) {
-            CryptoObject<Element>::operator=(rhs);
+            CryptoObject<Element>::operator=(std::move(rhs)); 
             this->m_elements         = std::move(rhs.m_elements);
+            this->m_elementKeyIndices= std::move(rhs.m_elementKeyIndices);  // 🔧 move key index map
             this->m_noiseScaleDeg    = std::move(rhs.m_noiseScaleDeg);
             this->m_level            = std::move(rhs.m_level);
             this->m_hopslevel        = std::move(rhs.m_hopslevel);
@@ -541,6 +551,10 @@ public:
                 out << std::endl;
             out << "Element " << i << ": " << c.m_elements[i];
         }
+        out << "\nkeyIndices: [ ";
+        for (size_t i = 0; i < c.m_elementKeyIndices.size(); ++i)
+            out << c.m_elementKeyIndices[i] << " ";
+        out << "]\n";
         return out;
     }
 
@@ -560,6 +574,7 @@ public:
         ar(cereal::make_nvp("e", encodingType));
         ar(cereal::make_nvp("sl", m_slots));
         ar(cereal::make_nvp("m", m_metadataMap));
+        ar(cereal::make_nvp("ki", m_elementKeyIndices));  // 🔧 serialize key index 
     }
 
     template <class Archive>
@@ -578,6 +593,7 @@ public:
         ar(cereal::make_nvp("e", encodingType));
         ar(cereal::make_nvp("sl", m_slots));
         ar(cereal::make_nvp("m", m_metadataMap));
+        ar(cereal::make_nvp("ki", m_elementKeyIndices));  // 🔧 load key index map
     }
 
     std::string SerializedObjectName() const {
@@ -587,9 +603,52 @@ public:
         return 1;
     }
 
+    // 🔧 New Getters/Setters for key index tracking
+    int32_t GetElementKeyIndex(size_t idx) const {
+        if (idx >= m_elementKeyIndices.size())
+            OPENFHE_THROW("GetElementKeyIndex: index out of bounds");
+        return m_elementKeyIndices[idx];
+    }
+
+    const std::vector<int32_t>& GetElementKeyIndexVector() const {
+        return m_elementKeyIndices;
+    }
+
+    std::vector<int32_t>& GetElementKeyIndexVector() {
+        return m_elementKeyIndices;
+    }
+
+    void SetElementKeyIndex(size_t idx, int32_t keyIdx) {
+        if (m_elementKeyIndices.size() <= idx)
+            m_elementKeyIndices.resize(idx + 1, KEY_DEP_S);  // default to s if not set
+        m_elementKeyIndices[idx] = keyIdx;
+    }
+
+    void SetElementKeyAsConstant(size_t idx) {
+        if (m_elementKeyIndices.size() <= idx)
+            m_elementKeyIndices.resize(idx + 1, KEY_DEP_S);
+        m_elementKeyIndices[idx] = KEY_DEP_CONSTANT;
+    }
+
+    void SetElementKeyAsS(size_t idx) {
+        if (m_elementKeyIndices.size() <= idx)
+            m_elementKeyIndices.resize(idx + 1, KEY_DEP_CONSTANT);
+        m_elementKeyIndices[idx] = KEY_DEP_S;
+    }
+
+    void SetElementKeyAsRotation(size_t idx, int32_t autoIndex) {
+        if (autoIndex <= 0)
+            OPENFHE_THROW("Rotation index must be positive.");
+        if (m_elementKeyIndices.size() <= idx)
+            m_elementKeyIndices.resize(idx + 1, KEY_DEP_S);
+        m_elementKeyIndices[idx] = autoIndex;
+    }
+
 private:
     // vector of ring elements for this Ciphertext
     std::vector<Element> m_elements;
+    // 🔧 New field: key index tracking per element (e.g., -1: constant, 1: s, i: gᵢ(s) for automorphism g)
+    std::vector<int32_t> m_elementKeyIndices;
 
     // the degree of the scaling factor for the encrypted message.
     uint32_t m_noiseScaleDeg = 1;
