@@ -197,6 +197,8 @@ std::shared_ptr<std::vector<Element>> PKEBase<Element>::EncryptZeroCore(const Pu
 
 template <class Element>
 Element PKEBase<Element>::DecryptCore(const std::vector<Element>& cv, const PrivateKey<Element> privateKey) const {
+    std::cout << "in Decrypt Core" << std::endl;
+    
     const Element& s = privateKey->GetPrivateElement();
 
     Element sPower = s;
@@ -206,7 +208,9 @@ Element PKEBase<Element>::DecryptCore(const std::vector<Element>& cv, const Priv
     Element ci;
     for (size_t i = 1; i < cv.size(); i++) {
         ci = cv[i];
+        std::cout << "before ntt" << std::endl; 
         ci.SetFormat(Format::EVALUATION);
+        std::cout << "after ntt" << std::endl; 
 
         b += sPower * ci;
         sPower *= s;

@@ -87,17 +87,17 @@ DecryptResult PKERNS::Decrypt(ConstCiphertext<DCRTPoly> ciphertext, const Privat
 
     b.SetFormat(Format::COEFFICIENT);
     size_t sizeQl = b.GetParams()->GetParams().size();
-
+    
     if (sizeQl == 0)
-        OPENFHE_THROW("Decryption failure: No towers left; consider increasing the depth.");
-
+    OPENFHE_THROW("Decryption failure: No towers left; consider increasing the depth.");
+    
     if (sizeQl == 1) {
         *plaintext = Poly(b.GetElementAtIndex(0), Format::COEFFICIENT);
     }
     else {
         *plaintext = b.CRTInterpolate();
     }
-
+    
     return DecryptResult(plaintext->GetLength());
 }
 
@@ -115,7 +115,6 @@ DecryptResult PKERNS::Decrypt(ConstCiphertext<DCRTPoly> ciphertext, const Privat
     }
 
     *plaintext = b.GetElementAtIndex(0);
-
     return DecryptResult(plaintext->GetLength());
 }
 
@@ -214,20 +213,20 @@ DCRTPoly PKERNS::DecryptCore(const std::vector<DCRTPoly>& cv, const PrivateKey<D
     size_t sizeQl = cv[0].GetParams()->GetParams().size();
 
     size_t diffQl = sizeQ - sizeQl;
-
+    
     auto scopy(s);
     scopy.DropLastElements(diffQl);
-
+    
     DCRTPoly sPower(scopy);
-
+    
     DCRTPoly b(cv[0]);
     b.SetFormat(Format::EVALUATION);
-
+    
     DCRTPoly ci;
     for (size_t i = 1; i < cv.size(); i++) {
         ci = cv[i];
         ci.SetFormat(Format::EVALUATION);
-
+        
         b += sPower * ci;
         sPower *= scopy;
     }

@@ -95,7 +95,10 @@ public:
     virtual void KeySwitchInPlace(Ciphertext<Element>& ciphertext, const EvalKey<Element> evalKey) const {
         OPENFHE_THROW("KeySwitch is not supported");
     }
-
+    virtual void BatchedKeySwitchInPlace(Ciphertext<Element>& ciphertext, const std::vector<Element>& cvToSwitch, const std::vector<EvalKey<Element>>& evalKeyVec) const {
+        OPENFHE_THROW("BatchedKeySwitch is not supported");
+    }
+    
     virtual Ciphertext<Element> KeySwitchExt(ConstCiphertext<Element> ciphertext, bool addFirst) const {
         OPENFHE_THROW("KeySwitchExt is not supported");
     }
@@ -115,10 +118,18 @@ public:
                                                                 const EvalKey<Element> evalKey) const {
         OPENFHE_THROW("KeySwitchCore is not supported");
     }
+    virtual std::shared_ptr<std::vector<Element>> BatchedKeySwitchCore(const std::vector<Element>& cv,
+                                                                const std::vector<EvalKey<Element>>& evalKeyVec) const {
+        OPENFHE_THROW("BatchedKeySwitchCore is not supported");
+    }
 
     virtual std::shared_ptr<std::vector<Element>> EvalKeySwitchPrecomputeCore(
         const Element& c, std::shared_ptr<CryptoParametersBase<Element>> cryptoParamsBase) const {
         OPENFHE_THROW("EvalKeySwitchPrecomputeCore is not supported");
+    }
+    virtual std::shared_ptr<std::vector<std::vector<DCRTPoly>>> EvalBatchedKeySwitchPrecomputeCore(
+        const std::vector<Element>& cv,  std::shared_ptr<CryptoParametersBase<Element>> cryptoParamsBase) const {
+        OPENFHE_THROW("EvalBatchedKeySwitchPrecomputeCore is not supported");
     }
 
     virtual std::shared_ptr<std::vector<Element>> EvalFastKeySwitchCore(
@@ -126,11 +137,23 @@ public:
         const std::shared_ptr<ParmType> paramsQl) const {
         OPENFHE_THROW("EvalFastKeySwitchCore is not supported");
     }
+    virtual std::shared_ptr<std::vector<Element>> EvalFastBatchedKeySwitchCore(
+        const std::shared_ptr<std::vector<std::vector<Element>>>& digitsAll,
+        const std::vector<EvalKey<Element>>& evalKeyVec,
+        const std::shared_ptr<ParmType> paramsQl) const {
+        OPENFHE_THROW("EvalBatchedFastKeySwitchCore is not supported");
+    }
 
     virtual std::shared_ptr<std::vector<Element>> EvalFastKeySwitchCoreExt(
         const std::shared_ptr<std::vector<Element>> digits, const EvalKey<Element> evalKey,
         const std::shared_ptr<ParmType> paramsQl) const {
         OPENFHE_THROW("EvalFastKeySwitchCoreExt is not supported");
+    }
+    virtual std::shared_ptr<std::vector<Element>> EvalFastBatchedKeySwitchCoreExt(
+        const std::shared_ptr<std::vector<std::vector<Element>>>& digitsAll,
+        const std::vector<EvalKey<Element>>& evalKeyVec,
+        const std::shared_ptr<ParmType> paramsQl) const {
+        OPENFHE_THROW("EvalBatchedFastKeySwitchCoreExt is not supported");
     }
 };
 

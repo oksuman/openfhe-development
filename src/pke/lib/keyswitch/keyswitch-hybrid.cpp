@@ -721,7 +721,6 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchHYBRID::EvalKeySwitchPrecomputeC
  std::shared_ptr<std::vector<DCRTPoly>> KeySwitchHYBRID::EvalFastKeySwitchCore(
     const std::shared_ptr<std::vector<DCRTPoly>> digits, const EvalKey<DCRTPoly> evalKey,
     const std::shared_ptr<ParmType> paramsQl) const {
-    std::cout << "Using KeySwitchHYBRID::EvalFastKeySwitchCore" << std::endl;
  
     if(digits == nullptr) {
         std::cout << "Error: digits is nullptr" << std::endl;

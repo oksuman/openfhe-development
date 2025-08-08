@@ -492,10 +492,9 @@ DecryptResult CryptoContextImpl<Element>::Decrypt(ConstCiphertext<Element> ciphe
     else {
         result = GetScheme()->Decrypt(ciphertext, privateKey, &decrypted->GetElement<NativePoly>());
     }
-
+    
     if (result.isValid == false)  // TODO (dsuponit): why don't we throw an exception here?
         return result;
-
     decrypted->SetScalingFactorInt(result.scalingFactorInt);
 
     if (ciphertext->GetEncodingType() == CKKS_PACKED_ENCODING) {
@@ -506,7 +505,6 @@ DecryptResult CryptoContextImpl<Element>::Decrypt(ConstCiphertext<Element> ciphe
         decryptedCKKS->SetSlots(ciphertext->GetSlots());
 
         const auto cryptoParamsCKKS = std::dynamic_pointer_cast<CryptoParametersRNS>(this->GetCryptoParameters());
-
         decryptedCKKS->Decode(ciphertext->GetNoiseScaleDeg(), ciphertext->GetScalingFactor(),
                               cryptoParamsCKKS->GetScalingTechnique(), cryptoParamsCKKS->GetExecutionMode());
     }

@@ -55,6 +55,7 @@
 
 #include "keyswitch/keyswitch-bv.h"
 #include "keyswitch/keyswitch-hybrid.h"
+#include "keyswitch/keyswitch-batched.h"
 
 #include "scheme/bgvrns/bgvrns-cryptoparameters.h"
 #include "scheme/bgvrns/bgvrns-parametergeneration.h"

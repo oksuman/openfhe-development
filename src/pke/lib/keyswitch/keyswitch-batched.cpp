@@ -18,14 +18,14 @@ namespace lbcrypto {
 
 EvalKey<DCRTPoly> KeySwitchBATCHED::KeySwitchGenInternal(const PrivateKey<DCRTPoly> oldKey,
                                                        const PrivateKey<DCRTPoly> newKey) const {
-   std::cout << "Using KeySwitchBATCHED::KeySwitchGenInternal (2 keys)" << std::endl;
+//    std::cout << "Using KeySwitchBATCHED::KeySwitchGenInternal (2 keys)" << std::endl;
    return KeySwitchBATCHED::KeySwitchGenInternal(oldKey, newKey, nullptr);
 }
 
 EvalKey<DCRTPoly> KeySwitchBATCHED::KeySwitchGenInternal(const PrivateKey<DCRTPoly> oldKey,
                                                        const PrivateKey<DCRTPoly> newKey,
                                                        const EvalKey<DCRTPoly> ekPrev) const {
-   std::cout << "Using KeySwitchBATCHED::KeySwitchGenInternal (3 params)" << std::endl;
+//    std::cout << "Using KeySwitchBATCHED::KeySwitchGenInternal (3 params)" << std::endl;
    
    if(oldKey == nullptr) {
        std::cout << "Error: oldKey is nullptr" << std::endl;
@@ -174,7 +174,7 @@ EvalKey<DCRTPoly> KeySwitchBATCHED::KeySwitchGenInternal(const PrivateKey<DCRTPo
 
 EvalKey<DCRTPoly> KeySwitchBATCHED::KeySwitchGenInternal(const PrivateKey<DCRTPoly> oldKey,
                                                        const PublicKey<DCRTPoly> newKey) const {
-   std::cout << "Using KeySwitchBATCHED::KeySwitchGenInternal (oldKey, newPubKey)" << std::endl;
+//    std::cout << "Using KeySwitchBATCHED::KeySwitchGenInternal (oldKey, newPubKey)" << std::endl;
    
    if(oldKey == nullptr) {
        std::cout << "Error: oldKey is nullptr" << std::endl;
@@ -300,61 +300,103 @@ EvalKey<DCRTPoly> KeySwitchBATCHED::KeySwitchGenInternal(const PrivateKey<DCRTPo
 }
 
 void KeySwitchBATCHED::KeySwitchInPlace(Ciphertext<DCRTPoly>& ciphertext, const EvalKey<DCRTPoly> ek) const {
-   std::cout << "Using KeySwitchBATCHED::KeySwitchInPlace" << std::endl;
+//    std::cout << "Using KeySwitchBATCHED::KeySwitchInPlace" << std::endl;
    
-   if(ciphertext == nullptr) {
-       std::cout << "Error: ciphertext is nullptr" << std::endl;
-       OPENFHE_THROW("ciphertext is nullptr");
-   }
-   
-   if(ek == nullptr) {
-       std::cout << "Error: ek is nullptr" << std::endl;
-       OPENFHE_THROW("ek is nullptr");
-   }
-   
-   std::vector<DCRTPoly>& cv = ciphertext->GetElements();
-   if(cv.empty()) {
-       std::cout << "Error: ciphertext elements vector is empty" << std::endl;
-       OPENFHE_THROW("ciphertext elements vector is empty");
-   }
-   
-   //std::cout << "Debug: ciphertext size = " << cv.size() << std::endl;
-   
-   std::shared_ptr<std::vector<DCRTPoly>> ba;
-   if(cv.size() == 2) {
-       //std::cout << "Debug: Calling KeySwitchCore with cv[1]" << std::endl;
-       ba = KeySwitchCore(cv[1], ek);
-   } else {
-       //std::cout << "Debug: Calling KeySwitchCore with cv[2]" << std::endl;
-       ba = KeySwitchCore(cv[2], ek);
-   }
-   
-   if(ba == nullptr) {
-       std::cout << "Error: KeySwitchCore returned nullptr" << std::endl;
-       OPENFHE_THROW("KeySwitchCore returned nullptr");
-   }
-   
-   if(ba->size() < 2) {
-       std::cout << "Error: KeySwitchCore result has size " << ba->size() << " (expected at least 2)" << std::endl;
-       OPENFHE_THROW("KeySwitchCore result has insufficient size");
-   }
+    if(ciphertext == nullptr) {
+        std::cout << "Error: ciphertext is nullptr" << std::endl;
+        OPENFHE_THROW("ciphertext is nullptr");
+    }
+    
+    if(ek == nullptr) {
+        std::cout << "Error: ek is nullptr" << std::endl;
+        OPENFHE_THROW("ek is nullptr");
+    }
+    
+    std::vector<DCRTPoly>& cv = ciphertext->GetElements();
+    if(cv.empty()) {
+        std::cout << "Error: ciphertext elements vector is empty" << std::endl;
+        OPENFHE_THROW("ciphertext elements vector is empty");
+    }
+    
+    std::shared_ptr<std::vector<DCRTPoly>> ba;
+    if(cv.size() == 2) {
+        ba = KeySwitchCore(cv[1], ek);
+    } else {
+        ba = KeySwitchCore(cv[2], ek);
+    }
+    
+    if(ba == nullptr) {
+        std::cout << "Error: KeySwitchCore returned nullptr" << std::endl;
+        OPENFHE_THROW("KeySwitchCore returned nullptr");
+    }
+    
+    if(ba->size() < 2) {
+        std::cout << "Error: KeySwitchCore result has size " << ba->size() << " (expected at least 2)" << std::endl;
+        OPENFHE_THROW("KeySwitchCore result has insufficient size");
+    }
 
-   cv[0].SetFormat((*ba)[0].GetFormat());
-   cv[0] += (*ba)[0];
+    cv[0].SetFormat((*ba)[0].GetFormat());
+    cv[0] += (*ba)[0];
 
-   cv[1].SetFormat((*ba)[1].GetFormat());
-   if (cv.size() > 2) {
-       cv[1] += (*ba)[1];
-   }
-   else {
-       cv[1] = (*ba)[1];
-   }
-   cv.resize(2);
-   //std::cout << "Debug: KeySwitchInPlace completed" << std::endl;
+    cv[1].SetFormat((*ba)[1].GetFormat());
+    if (cv.size() > 2) {
+        cv[1] += (*ba)[1];
+    }
+    else {
+        cv[1] = (*ba)[1];
+    }
+    cv.resize(2);
 }
 
+// s^2 not considered, only autormophism
+void KeySwitchBATCHED::BatchedKeySwitchInPlace(
+    Ciphertext<DCRTPoly>& ciphertext,
+    const std::vector<DCRTPoly>& cvToSwitch,
+    const std::vector<EvalKey<DCRTPoly>>& evalKeyVec) const {
+
+    // std::cout << "Using KeySwitchBATCHED::BatchedKeySwitchInPlace (simplified)" << std::endl;
+
+    if (!ciphertext) {
+        OPENFHE_THROW("ciphertext is nullptr");
+    }
+
+    std::vector<DCRTPoly>& cv = ciphertext->GetElements();
+    std::vector<int32_t>& keyDeps = ciphertext->GetElementKeyIndexVector();
+
+    if (cv.empty() || keyDeps.size() != cv.size()) {
+        OPENFHE_THROW("Ciphertext structure invalid");
+    }
+
+    if (!cvToSwitch.empty()) {
+        auto switched = BatchedKeySwitchCore(cvToSwitch, evalKeyVec);
+        if (!switched || switched->size() != 2) {
+            OPENFHE_THROW("BatchedKeySwitchCore returned invalid result");
+        }
+
+        // Add to ct0
+        cv[0] += (*switched)[0];
+
+        if (cv.size() == 2) {
+            cv[1] += (*switched)[1];
+        }
+        else {
+            cv.push_back((*switched)[1]);
+            keyDeps.push_back(CiphertextImpl<DCRTPoly>::KEY_DEP_S);
+        }
+    }
+
+    // Ensure keyDeps[0] is set properly (even if switched was empty)
+    keyDeps[0] = CiphertextImpl<DCRTPoly>::KEY_DEP_CONSTANT;
+    if (cv.size() == 2)
+        keyDeps[1] = CiphertextImpl<DCRTPoly>::KEY_DEP_S;
+
+    std::cout << "KeySwitchBATCHED::BatchedKeySwitchInPlace completed" << std::endl;
+}
+
+
+
 Ciphertext<DCRTPoly> KeySwitchBATCHED::KeySwitchExt(ConstCiphertext<DCRTPoly> ciphertext, bool addFirst) const {
-   std::cout << "Using KeySwitchBATCHED::KeySwitchExt" << std::endl;
+//    std::cout << "Using KeySwitchBATCHED::KeySwitchExt" << std::endl;
    
    if(ciphertext == nullptr) {
        std::cout << "Error: ciphertext is nullptr" << std::endl;
@@ -422,7 +464,7 @@ Ciphertext<DCRTPoly> KeySwitchBATCHED::KeySwitchExt(ConstCiphertext<DCRTPoly> ci
 }
 
 Ciphertext<DCRTPoly> KeySwitchBATCHED::KeySwitchDown(ConstCiphertext<DCRTPoly> ciphertext) const {
-   std::cout << "Using KeySwitchBATCHED::KeySwitchDown" << std::endl;
+//    std::cout << "Using KeySwitchBATCHED::KeySwitchDown" << std::endl;
    
    if(ciphertext == nullptr) {
        std::cout << "Error: ciphertext is nullptr" << std::endl;
@@ -537,7 +579,7 @@ DCRTPoly KeySwitchBATCHED::KeySwitchDownFirstElement(ConstCiphertext<DCRTPoly> c
 
 std::shared_ptr<std::vector<DCRTPoly>> KeySwitchBATCHED::KeySwitchCore(const DCRTPoly& a,
                                                                      const EvalKey<DCRTPoly> evalKey) const {
-    std::cout << "Using KeySwitchBATCHED::KeySwitchCore" << std::endl;
+    // std::cout << "Using KeySwitchBATCHED::KeySwitchCore" << std::endl;
     
     if(evalKey == nullptr) {
         std::cout << "Error: evalKey is nullptr" << std::endl;
@@ -574,9 +616,51 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchBATCHED::KeySwitchCore(const DCR
     return EvalFastKeySwitchCore(digits, evalKey, paramsQl);
 }
 
+std::shared_ptr<std::vector<DCRTPoly>> 
+KeySwitchBATCHED::BatchedKeySwitchCore(
+    const std::vector<DCRTPoly>& cv,
+    const std::vector<EvalKey<DCRTPoly>>& evalKeyVec) const {
+
+    // std::cout << "Using KeySwitchBATCHED::BatchedKeySwitchCore (batch-aware)" << std::endl;
+
+    if (cv.size() != evalKeyVec.size()) {
+        OPENFHE_THROW("BatchedKeySwitchCore: mismatch between cv and evalKeyVec size");
+    }
+
+    if (cv.empty()) {
+        OPENFHE_THROW("BatchedKeySwitchCore: empty input ciphertext vector");
+    }
+
+    auto cryptoParams = evalKeyVec[0]->GetCryptoParameters();
+    if (!cryptoParams) {
+        OPENFHE_THROW("BatchedKeySwitchCore: cryptoParams is nullptr");
+    }
+
+    // === 시간 측정 시작 ===
+    auto start = std::chrono::high_resolution_clock::now();
+
+    // Digit decomposition: vector<vector<DCRTPoly>>
+    auto allDigits = EvalBatchedKeySwitchPrecomputeCore(cv, cryptoParams);
+    if (!allDigits || allDigits->size() != cv.size()) {
+        OPENFHE_THROW("BatchedKeySwitchCore: EvalKeySwitchPrecomputeCore returned invalid result");
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration_us = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+    std::cout << "[TIMING] Digit decomposition took " << duration_us / 1000.0 << " ms" << std::endl;
+    // === 시간 측정 끝 ===
+
+    // Perform fast batched key switching
+    const auto paramsQl = cv[0].GetParams();
+    if (!paramsQl) {
+        OPENFHE_THROW("BatchedKeySwitchCore: paramsQl is nullptr");
+    }
+
+    return EvalFastBatchedKeySwitchCore(allDigits, evalKeyVec, paramsQl);
+}
+
 std::shared_ptr<std::vector<DCRTPoly>> KeySwitchBATCHED::EvalKeySwitchPrecomputeCore(
     const DCRTPoly& c, std::shared_ptr<CryptoParametersBase<DCRTPoly>> cryptoParamsBase) const {
-    std::cout << "Using KeySwitchBATCHED::EvalKeySwitchPrecomputeCore" << std::endl;
+    // std::cout << "Using KeySwitchBATCHED::EvalKeySwitchPrecomputeCore" << std::endl;
     
     if(cryptoParamsBase == nullptr) {
         std::cout << "Error: cryptoParamsBase is nullptr" << std::endl;
@@ -756,10 +840,123 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchBATCHED::EvalKeySwitchPrecompute
     return std::make_shared<std::vector<DCRTPoly>>(std::move(partsCtExt));
 }
 
+std::shared_ptr<std::vector<std::vector<DCRTPoly>>>
+KeySwitchBATCHED::EvalBatchedKeySwitchPrecomputeCore(
+    const std::vector<DCRTPoly>& cv,
+    std::shared_ptr<CryptoParametersBase<DCRTPoly>> cryptoParamsBase) const {
+
+    // std::cout << "Using KeySwitchBATCHED::EvalBatchedKeySwitchPrecomputeCore (batch-aware)" << std::endl;
+
+    if (!cryptoParamsBase) {
+        OPENFHE_THROW("cryptoParamsBase is nullptr");
+    }
+
+    auto cryptoParams = std::dynamic_pointer_cast<CryptoParametersRNS>(cryptoParamsBase);
+    if (!cryptoParams) {
+        OPENFHE_THROW("cryptoParams cast failed");
+    }
+
+    if (cv.empty()) {
+        OPENFHE_THROW("EvalBatchedKeySwitchPrecomputeCore: input ciphertext vector is empty");
+    }
+
+    const auto paramsQl = cv[0].GetParams();
+    const auto paramsP = cryptoParams->GetParamsP();
+    const auto paramsQlP = cv[0].GetExtendedCRTBasis(paramsP);
+    if (!paramsQl || !paramsP || !paramsQlP) {
+        OPENFHE_THROW("Missing CRT parameter(s)");
+    }
+
+    const size_t sizeQl = paramsQl->GetParams().size();
+    const size_t sizeP = paramsP->GetParams().size();
+    const size_t sizeQlP = sizeQl + sizeP;
+    const uint32_t alpha = cryptoParams->GetNumPerPartQ();
+    uint32_t numPartQl = ceil((static_cast<double>(sizeQl)) / alpha);
+    if (numPartQl > cryptoParams->GetNumberOfQPartitions()) {
+        numPartQl = cryptoParams->GetNumberOfQPartitions();
+    }
+
+    auto result = std::make_shared<std::vector<std::vector<DCRTPoly>>>();
+    result->reserve(cv.size());
+
+    for (const auto& c : cv) {
+        std::vector<DCRTPoly> partsCt(numPartQl);
+
+        for (uint32_t part = 0; part < numPartQl; ++part) {
+            auto paramsPartQ = cryptoParams->GetParamsPartQ(part);
+            if (!paramsPartQ) {
+                OPENFHE_THROW("paramsPartQ is nullptr");
+            }
+
+            if (part == numPartQl - 1) {
+                const uint32_t sizePartQl = sizeQl - alpha * part;
+                std::vector<NativeInteger> moduli(sizePartQl), roots(sizePartQl);
+                for (uint32_t i = 0; i < sizePartQl; ++i) {
+                    moduli[i] = paramsPartQ->GetParams()[i]->GetModulus();
+                    roots[i] = paramsPartQ->GetParams()[i]->GetRootOfUnity();
+                }
+                auto params = DCRTPoly::Params(paramsPartQ->GetCyclotomicOrder(), moduli, roots);
+                partsCt[part] = DCRTPoly(std::make_shared<ParmType>(params), Format::EVALUATION, true);
+            } else {
+                partsCt[part] = DCRTPoly(paramsPartQ, Format::EVALUATION, true);
+            }
+
+            const usint sizePartQl = partsCt[part].GetNumOfElements();
+            const usint startPartIdx = alpha * part;
+            for (usint i = 0, idx = startPartIdx; i < sizePartQl; ++i, ++idx) {
+                partsCt[part].SetElementAtIndex(i, c.GetElementAtIndex(idx));
+            }
+        }
+
+        std::vector<DCRTPoly> partsCtExt(numPartQl);
+
+        for (uint32_t part = 0; part < numPartQl; ++part) {
+            auto partCtClone = partsCt[part].Clone();
+            partCtClone.SetFormat(Format::COEFFICIENT);
+
+            const auto sizePartQl = partsCt[part].GetNumOfElements();
+            auto paramsPartQ = cryptoParams->GetParamsPartQ(part);
+            auto paramsComplPartQ = cryptoParams->GetParamsComplPartQ(sizeQl - 1, part);
+            auto partQlHatInvModq = cryptoParams->GetPartQlHatInvModq(part, sizePartQl - 1);
+            auto partQlHatInvModqPrecon = cryptoParams->GetPartQlHatInvModqPrecon(part, sizePartQl - 1);
+            auto partQlHatModp = cryptoParams->GetPartQlHatModp(sizeQl - 1, part);
+            auto modComplPartqBarrettMu = cryptoParams->GetmodComplPartqBarrettMu(sizeQl - 1, part);
+
+            auto partsCtCompl = partCtClone.ApproxSwitchCRTBasis(
+                paramsPartQ, paramsComplPartQ,
+                partQlHatInvModq, partQlHatInvModqPrecon,
+                partQlHatModp, modComplPartqBarrettMu);
+
+            partsCtCompl.SetFormat(Format::EVALUATION);
+
+            DCRTPoly ext(paramsQlP, Format::EVALUATION, true);
+            const usint startPartIdx = alpha * part;
+            const usint endPartIdx = startPartIdx + sizePartQl;
+
+            for (usint i = 0; i < startPartIdx; ++i)
+                ext.SetElementAtIndex(i, partsCtCompl.GetElementAtIndex(i));
+
+            for (usint i = startPartIdx, idx = 0; i < endPartIdx; ++i, ++idx)
+                ext.SetElementAtIndex(i, partsCt[part].GetElementAtIndex(idx));
+
+            for (usint i = endPartIdx; i < sizeQlP; ++i) {
+                usint adjIdx = i - sizePartQl;
+                ext.SetElementAtIndex(i, partsCtCompl.GetElementAtIndex(adjIdx));
+            }
+
+            partsCtExt[part] = std::move(ext);
+        }
+
+        result->emplace_back(std::move(partsCtExt));
+    }
+
+    return result;
+}
+
 std::shared_ptr<std::vector<DCRTPoly>> KeySwitchBATCHED::EvalFastKeySwitchCore(
     const std::shared_ptr<std::vector<DCRTPoly>> digits, const EvalKey<DCRTPoly> evalKey,
     const std::shared_ptr<ParmType> paramsQl) const {
-    std::cout << "Using KeySwitchBATCHED::EvalFastKeySwitchCore" << std::endl;
+    // std::cout << "Using KeySwitchBATCHED::EvalFastKeySwitchCore" << std::endl;
 
     if(digits == nullptr) {
         std::cout << "Error: digits is nullptr" << std::endl;
@@ -824,10 +1021,80 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchBATCHED::EvalFastKeySwitchCore(
     return std::make_shared<std::vector<DCRTPoly>>(std::initializer_list<DCRTPoly>{std::move(ct0), std::move(ct1)});
 }
 
+std::shared_ptr<std::vector<DCRTPoly>> KeySwitchBATCHED::EvalFastBatchedKeySwitchCore(
+    const std::shared_ptr<std::vector<std::vector<DCRTPoly>>>& digitsAll,
+    const std::vector<EvalKey<DCRTPoly>>& evalKeyVec,
+    const std::shared_ptr<ParmType> paramsQl) const {
+
+    // std::cout << "Using KeySwitchBATCHED::EvalFastBatchedKeySwitchCore" << std::endl;
+
+    if (!digitsAll) {
+        OPENFHE_THROW("EvalFastBatchedKeySwitchCore: digitsAll is nullptr");
+    }
+    if (digitsAll->empty()) {
+        OPENFHE_THROW("EvalFastBatchedKeySwitchCore: digitsAll is empty");
+    }
+    if (evalKeyVec.empty()) {
+        OPENFHE_THROW("EvalFastBatchedKeySwitchCore: evalKeyVec is empty");
+    }
+    if (digitsAll->size() != evalKeyVec.size()) {
+        OPENFHE_THROW("EvalFastBatchedKeySwitchCore: size mismatch between digitsAll and evalKeyVec");
+    }
+    if (!paramsQl) {
+        OPENFHE_THROW("EvalFastBatchedKeySwitchCore: paramsQl is nullptr");
+    }
+
+    const EvalKey<DCRTPoly>  firstEK = evalKeyVec[0];
+    if (!firstEK) {
+        OPENFHE_THROW("EvalFastBatchedKeySwitchCore: first evalKey is nullptr");
+    }
+
+    const auto cryptoParams = std::dynamic_pointer_cast<CryptoParametersRNS>(firstEK->GetCryptoParameters());
+    if (!cryptoParams) {
+        OPENFHE_THROW("EvalFastBatchedKeySwitchCore: cryptoParams cast failed");
+    }
+
+    // Step 1: Batched KeySwitchCoreExt (aggregates all dependencies)
+    // --- EvalFastKeySwitchCoreExt 시간 측정 ---
+    auto start_ks = std::chrono::high_resolution_clock::now();
+    auto cTildaPair = EvalFastBatchedKeySwitchCoreExt(digitsAll, evalKeyVec, paramsQl);
+    if (!cTildaPair || cTildaPair->size() < 2) {
+        OPENFHE_THROW("EvalFastBatchedKeySwitchCore: EvalFastBatchedKeySwitchCoreExt returned invalid result");
+    }
+    auto end_ks = std::chrono::high_resolution_clock::now();
+    auto duration_ks = std::chrono::duration_cast<std::chrono::microseconds>(end_ks - start_ks).count();
+    std::cout << "[TIMING] EvalFastBatchedKeySwitchCoreExt took " << duration_ks / 1000.0 << " ms" << std::endl;
+
+    const PlaintextModulus t = (cryptoParams->GetNoiseScale() == 1) ? 0 : cryptoParams->GetPlaintextModulus();
+
+    // Step 2: ApproxModDown for both elements
+    // --- ApproxModDown 시간 측정 ---
+    auto start_moddown = std::chrono::high_resolution_clock::now();
+    DCRTPoly ct0 = (*cTildaPair)[0].ApproxModDown(paramsQl, cryptoParams->GetParamsP(), cryptoParams->GetPInvModq(),
+                                                 cryptoParams->GetPInvModqPrecon(), cryptoParams->GetPHatInvModp(),
+                                                 cryptoParams->GetPHatInvModpPrecon(), cryptoParams->GetPHatModq(),
+                                                 cryptoParams->GetModqBarrettMu(), cryptoParams->GettInvModp(),
+                                                 cryptoParams->GettInvModpPrecon(), t, cryptoParams->GettModqPrecon());
+
+    DCRTPoly ct1 = (*cTildaPair)[1].ApproxModDown(paramsQl, cryptoParams->GetParamsP(), cryptoParams->GetPInvModq(),
+                                                 cryptoParams->GetPInvModqPrecon(), cryptoParams->GetPHatInvModp(),
+                                                 cryptoParams->GetPHatInvModpPrecon(), cryptoParams->GetPHatModq(),
+                                                 cryptoParams->GetModqBarrettMu(), cryptoParams->GettInvModp(),
+                                                 cryptoParams->GettInvModpPrecon(), t, cryptoParams->GettModqPrecon());
+
+    auto end_moddown = std::chrono::high_resolution_clock::now();
+    auto duration_moddown = std::chrono::duration_cast<std::chrono::microseconds>(end_moddown - start_moddown).count();
+    std::cout << "[TIMING] ApproxModDown (both elements) took " << duration_moddown / 1000.0 << " ms" << std::endl;
+
+    // Step 3: Return result
+    return std::make_shared<std::vector<DCRTPoly>>(std::initializer_list<DCRTPoly>{std::move(ct0), std::move(ct1)});
+}
+
+
 std::shared_ptr<std::vector<DCRTPoly>> KeySwitchBATCHED::EvalFastKeySwitchCoreExt(
     const std::shared_ptr<std::vector<DCRTPoly>> digits, const EvalKey<DCRTPoly> evalKey,
     const std::shared_ptr<ParmType> paramsQl) const {
-    std::cout << "Using KeySwitchBATCHED::EvalFastKeySwitchCoreExt" << std::endl;
+    // std::cout << "Using KeySwitchBATCHED::EvalFastKeySwitchCoreExt" << std::endl;
  
     if(digits == nullptr) {
         std::cout << "Error: digits is nullptr" << std::endl;
@@ -953,29 +1220,170 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchBATCHED::EvalFastKeySwitchCoreEx
         }
     }
     
-    // std::cout << "Debug: Final state check in EvalFastKeySwitchCoreExt" << std::endl;
-    // std::cout << "Debug: cTilda0 elements: " << cTilda0.GetNumOfElements() 
-    //           << ", format: " << static_cast<int>(cTilda0.GetFormat()) << std::endl;
-    // std::cout << "Debug: cTilda1 elements: " << cTilda1.GetNumOfElements() 
-    //           << ", format: " << static_cast<int>(cTilda1.GetFormat()) << std::endl;
-    
     if(cTilda0.GetNumOfElements() > 0) {
         auto firstElement = cTilda0.GetElementAtIndex(0);
-        //std::cout << "Debug: cTilda0 first element isValid: " << !firstElement.IsEmpty() << std::endl;
     }
     
     if(cTilda1.GetNumOfElements() > 0) {
         auto firstElement = cTilda1.GetElementAtIndex(0);
-        //std::cout << "Debug: cTilda1 first element isValid: " << !firstElement.IsEmpty() << std::endl;
     }
     
     auto result = std::make_shared<std::vector<DCRTPoly>>(
         std::initializer_list<DCRTPoly>{cTilda0, cTilda1});
-    //std::cout << "Debug: Result vector created with size: " << result->size() << std::endl;
-    
-    //std::cout << "Debug: EvalFastKeySwitchCoreExt completed" << std::endl;
- 
     return result;
- }
+}
+
+std::shared_ptr<std::vector<DCRTPoly>> KeySwitchBATCHED::EvalFastBatchedKeySwitchCoreExt(
+    const std::shared_ptr<std::vector<std::vector<DCRTPoly>>>& digitsAll,
+    const std::vector<EvalKey<DCRTPoly>>& evalKeyVec,
+    const std::shared_ptr<ParmType> paramsQl) const {
+
+    // std::cout << "Using KeySwitchBATCHED::EvalFastBatchedKeySwitchCoreExt" << std::endl;
+
+    if (!digitsAll) {
+        std::cout << "Error: digitsAll is nullptr" << std::endl;
+        OPENFHE_THROW("digitsAll is nullptr");
+    }
+    if (digitsAll->empty()) {
+        std::cout << "Error: digitsAll is empty" << std::endl;
+        OPENFHE_THROW("digitsAll is empty");
+    }
+    if (evalKeyVec.empty()) {
+        std::cout << "Error: evalKeyVec is empty" << std::endl;
+        OPENFHE_THROW("evalKeyVec is empty");
+    }
+    if (digitsAll->size() != evalKeyVec.size()) {
+        std::cout << "Error: size mismatch: digitsAll=" << digitsAll->size()
+                  << " evalKeyVec=" << evalKeyVec.size() << std::endl;
+        OPENFHE_THROW("digitsAll and evalKeyVec size mismatch");
+    }
+    if (!paramsQl) {
+        std::cout << "Error: paramsQl is nullptr" << std::endl;
+        OPENFHE_THROW("paramsQl is nullptr");
+    }
+
+    const EvalKey<DCRTPoly> firstEK = evalKeyVec[0];
+    if (firstEK == nullptr) {
+        std::cout << "Error: first evalKey is nullptr" << std::endl;
+        OPENFHE_THROW("evalKey is nullptr");
+    }
+
+    const auto cryptoParams = std::dynamic_pointer_cast<CryptoParametersRNS>(firstEK->GetCryptoParameters());
+    if (!cryptoParams) {
+        std::cout << "Error: cryptoParams cast failed" << std::endl;
+        OPENFHE_THROW("cryptoParams cast failed");
+    }
+
+    if ((*digitsAll)[0].empty()) {
+        std::cout << "Error: digitsAll[0] is empty" << std::endl;
+        OPENFHE_THROW("digitsAll[0] is empty");
+    }
+
+    const std::shared_ptr<ParmType> paramsQlP = (*digitsAll)[0][0].GetParams();
+    if (!paramsQlP) {
+        std::cout << "Error: paramsQlP is nullptr" << std::endl;
+        OPENFHE_THROW("paramsQlP is nullptr");
+    }
+
+    const size_t sizeQl  = paramsQl->GetParams().size();
+    const size_t sizeQlP = paramsQlP->GetParams().size();
+    const size_t sizeQ   = cryptoParams->GetElementParams()->GetParams().size();
+
+    DCRTPoly cTilda0(paramsQlP, Format::EVALUATION, true);
+    DCRTPoly cTilda1(paramsQlP, Format::EVALUATION, true);
+
+    for (size_t k = 0; k < evalKeyVec.size(); ++k) {
+        const auto ek = evalKeyVec[k];
+        if (ek == nullptr) {
+            std::cout << "Error: evalKeyVec[" << k << "] is nullptr" << std::endl;
+            OPENFHE_THROW("evalKey is nullptr");
+        }
+
+        const auto& digits = (*digitsAll)[k];
+        if (digits.empty()) {
+            std::cout << "Error: digitsAll[" << k << "] is empty" << std::endl;
+            OPENFHE_THROW("digitsAll[k] is empty");
+        }
+
+        const std::vector<DCRTPoly>& bv = ek->GetBVector();
+        const std::vector<DCRTPoly>& av = ek->GetAVector();
+
+        if (bv.empty()) {
+            std::cout << "Error: bv is empty at k=" << k << std::endl;
+            OPENFHE_THROW("bv is empty");
+        }
+        if (av.empty()) {
+            std::cout << "Error: av is empty at k=" << k << std::endl;
+            OPENFHE_THROW("av is empty");
+        }
+        if (bv.size() != digits.size() || av.size() != digits.size()) {
+            std::cout << "Error: digit/evalKey vector size mismatch at k=" << k
+                      << " digits=" << digits.size()
+                      << " bv=" << bv.size()
+                      << " av=" << av.size() << std::endl;
+            OPENFHE_THROW("digit/evalKey vector size mismatch");
+        }
+
+        for (uint32_t j = 0; j < digits.size(); ++j) {
+            const DCRTPoly& cj = digits[j];
+            const DCRTPoly& bj = bv[j];
+            const DCRTPoly& aj = av[j];
+
+            for (usint i = 0; i < sizeQl; ++i) {
+                if (i >= cj.GetNumOfElements()) {
+                    std::cout << "Warning: i=" << i << " out of bounds for cj (size="
+                              << cj.GetNumOfElements() << "), skipping" << std::endl;
+                    continue;
+                }
+                if (i >= bj.GetNumOfElements()) {
+                    std::cout << "Warning: i=" << i << " out of bounds for bj (size="
+                              << bj.GetNumOfElements() << "), skipping" << std::endl;
+                    continue;
+                }
+                if (i >= aj.GetNumOfElements()) {
+                    std::cout << "Warning: i=" << i << " out of bounds for aj (size="
+                              << aj.GetNumOfElements() << "), skipping" << std::endl;
+                    continue;
+                }
+
+                const auto& cji = cj.GetElementAtIndex(i);
+                const auto& bji = bj.GetElementAtIndex(i);
+                const auto& aji = aj.GetElementAtIndex(i);
+
+                cTilda0.SetElementAtIndex(i, cTilda0.GetElementAtIndex(i) + cji * bji);
+                cTilda1.SetElementAtIndex(i, cTilda1.GetElementAtIndex(i) + cji * aji);
+            }
+
+            for (usint i = sizeQl, idx = sizeQ; i < sizeQlP; ++i, ++idx) {
+                if (i >= cj.GetNumOfElements()) {
+                    std::cout << "Warning: i=" << i << " out of bounds for cj (size="
+                              << cj.GetNumOfElements() << "), skipping" << std::endl;
+                    continue;
+                }
+                if (idx >= bj.GetNumOfElements()) {
+                    std::cout << "Warning: idx=" << idx << " out of bounds for bj (size="
+                              << bj.GetNumOfElements() << "), skipping" << std::endl;
+                    continue;
+                }
+                if (idx >= aj.GetNumOfElements()) {
+                    std::cout << "Warning: idx=" << idx << " out of bounds for aj (size="
+                              << aj.GetNumOfElements() << "), skipping" << std::endl;
+                    continue;
+                }
+
+                const auto& cji = cj.GetElementAtIndex(i);
+                const auto& bji = bj.GetElementAtIndex(idx);
+                const auto& aji = aj.GetElementAtIndex(idx);
+
+                cTilda0.SetElementAtIndex(i, cTilda0.GetElementAtIndex(i) + cji * bji);
+                cTilda1.SetElementAtIndex(i, cTilda1.GetElementAtIndex(i) + cji * aji);
+            }
+        }
+    }
+
+    auto result = std::make_shared<std::vector<DCRTPoly>>(std::initializer_list<DCRTPoly>{cTilda0, cTilda1});
+    return result;
+}
+
 
 }  // namespace lbcrypto

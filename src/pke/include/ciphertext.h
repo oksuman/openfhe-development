@@ -469,6 +469,7 @@ public:
     virtual Ciphertext<Element> Clone() const {
         Ciphertext<Element> cRes = this->CloneZero();
         cRes->SetElements(this->GetElements());
+        cRes->SetElementKeyIndexVector(this->GetElementKeyIndexVector());
 
         return cRes;
     }
@@ -618,6 +619,10 @@ public:
         return m_elementKeyIndices;
     }
 
+    void SetElementKeyIndexVector(const std::vector<int32_t>& keyIndices) {
+        m_elementKeyIndices = keyIndices;
+    }
+    
     void SetElementKeyIndex(size_t idx, int32_t keyIdx) {
         if (m_elementKeyIndices.size() <= idx)
             m_elementKeyIndices.resize(idx + 1, KEY_DEP_S);  // default to s if not set

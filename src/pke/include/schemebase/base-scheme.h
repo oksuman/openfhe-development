@@ -241,7 +241,6 @@ public:
     }
 
     virtual Ciphertext<Element> Encrypt(const Element& plaintext, const PublicKey<Element> publicKey) const {
-        std::cout << "public key enc" << std::endl;
         
         VerifyPKEEnabled(__func__);
         //      if (!plaintext)
@@ -351,6 +350,19 @@ public:
         return;
     }
 
+    virtual void BatchedKeySwitchInPlace(
+        Ciphertext<DCRTPoly>& ciphertext,
+        const std::vector<DCRTPoly>& cvToSwitch,
+        const std::vector<EvalKey<DCRTPoly>>& evalKeyVec) const {
+        
+        VerifyKeySwitchEnabled(__func__);
+
+        if (!ciphertext)
+            OPENFHE_THROW("Input ciphertext is nullptr");
+
+        m_KeySwitch->BatchedKeySwitchInPlace(ciphertext, cvToSwitch, evalKeyVec);
+    }
+
     virtual Ciphertext<Element> KeySwitchDown(ConstCiphertext<Element> ciphertext) const {
         VerifyKeySwitchEnabled(__func__);
         if (!ciphertext)
@@ -445,6 +457,16 @@ public:
         return m_LeveledSHE->EvalAdd(ciphertext1, ciphertext2);
     }
 
+    virtual Ciphertext<Element> EvalLazyAdd(ConstCiphertext<Element> ciphertext1,
+                                        ConstCiphertext<Element> ciphertext2) const {
+        VerifyLeveledSHEEnabled(__func__);
+        if (!ciphertext1)
+            OPENFHE_THROW("Input first ciphertext is nullptr");
+        if (!ciphertext2)
+            OPENFHE_THROW("Input second ciphertext is nullptr");
+        return m_LeveledSHE->EvalLazyAdd(ciphertext1, ciphertext2);
+    }
+
     virtual void EvalAddInPlace(Ciphertext<Element>& ciphertext1, ConstCiphertext<Element> ciphertext2) const {
         VerifyLeveledSHEEnabled(__func__);
         if (!ciphertext1)
@@ -452,6 +474,16 @@ public:
         if (!ciphertext2)
             OPENFHE_THROW("Input second ciphertext is nullptr");
         m_LeveledSHE->EvalAddInPlace(ciphertext1, ciphertext2);
+        return;
+    }
+
+    virtual void EvalLazyAddInPlace(Ciphertext<Element>& ciphertext1, ConstCiphertext<Element> ciphertext2) const {
+        VerifyLeveledSHEEnabled(__func__);
+        if (!ciphertext1)
+            OPENFHE_THROW("Input first ciphertext is nullptr");
+        if (!ciphertext2)
+            OPENFHE_THROW("Input second ciphertext is nullptr");
+        m_LeveledSHE->EvalLazyAddInPlace(ciphertext1, ciphertext2);
         return;
     }
 
@@ -549,7 +581,27 @@ public:
         return m_LeveledSHE->EvalSub(ciphertext1, ciphertext2);
     }
 
+    virtual Ciphertext<Element> EvalLazySub(ConstCiphertext<Element> ciphertext1,
+                                        ConstCiphertext<Element> ciphertext2) const {
+        VerifyLeveledSHEEnabled(__func__);
+        if (!ciphertext1)
+            OPENFHE_THROW("Input first ciphertext is nullptr");
+        if (!ciphertext2)
+            OPENFHE_THROW("Input second ciphertext is nullptr");
+        return m_LeveledSHE->EvalLazySub(ciphertext1, ciphertext2);
+    }
+
     virtual void EvalSubInPlace(Ciphertext<Element>& ciphertext1, ConstCiphertext<Element> ciphertext2) const {
+        VerifyLeveledSHEEnabled(__func__);
+        if (!ciphertext1)
+            OPENFHE_THROW("Input first ciphertext is nullptr");
+        if (!ciphertext2)
+            OPENFHE_THROW("Input second ciphertext is nullptr");
+        m_LeveledSHE->EvalSubInPlace(ciphertext1, ciphertext2);
+        return;
+    }
+
+    virtual void EvalLazySubInPlace(Ciphertext<Element>& ciphertext1, ConstCiphertext<Element> ciphertext2) const {
         VerifyLeveledSHEEnabled(__func__);
         if (!ciphertext1)
             OPENFHE_THROW("Input first ciphertext is nullptr");

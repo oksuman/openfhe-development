@@ -103,6 +103,8 @@ public:
    */
     virtual Ciphertext<Element> EvalAdd(ConstCiphertext<Element> ciphertext1,
                                         ConstCiphertext<Element> ciphertext2) const;
+    virtual Ciphertext<Element> EvalLazyAdd(ConstCiphertext<Element> ciphertext1,
+                                        ConstCiphertext<Element> ciphertext2) const;
 
     /**
    * Virtual function to define the interface for in-place homomorphic addition
@@ -112,6 +114,7 @@ public:
    * @param ciphertext2 the input ciphertext.
    */
     virtual void EvalAddInPlace(Ciphertext<Element>& ciphertext1, ConstCiphertext<Element> ciphertext2) const;
+    virtual void EvalLazyAddInPlace(Ciphertext<Element>& ciphertext1, ConstCiphertext<Element> ciphertext2) const;
 
     /**
    * Virtual function to define the interface for homomorphic addition of
@@ -206,6 +209,8 @@ public:
    */
     virtual Ciphertext<Element> EvalSub(ConstCiphertext<Element> ciphertext1,
                                         ConstCiphertext<Element> ciphertext2) const;
+    virtual Ciphertext<Element> EvalLazySub(ConstCiphertext<Element> ciphertext1,
+                                        ConstCiphertext<Element> ciphertext2) const;
 
     /**
    * Virtual function to define the interface for homomorphic subtraction of
@@ -215,6 +220,7 @@ public:
    * @param ciphertext2 the input ciphertext.
    */
     virtual void EvalSubInPlace(Ciphertext<Element>& ciphertext1, ConstCiphertext<Element> ciphertext2) const;
+    virtual void EvalLazySubInPlace(Ciphertext<Element>& ciphertext1, ConstCiphertext<Element> ciphertext2) const;
 
     /**
    * Virtual function to define the interface for homomorphic subtraction of
@@ -815,6 +821,10 @@ protected:
    */
     virtual Ciphertext<Element> EvalAddCore(ConstCiphertext<Element> ciphertext1,
                                             ConstCiphertext<Element> ciphertext2) const;
+    virtual Ciphertext<Element> EvalLazyAddCore(ConstCiphertext<Element> ciphertext1,
+                                            ConstCiphertext<Element> ciphertext2) const;
+
+
 
     /**
    * Internal function for in-place homomorphic addition of ciphertexts.
@@ -827,9 +837,13 @@ protected:
    * input ciphertexts.
    */
     void EvalAddCoreInPlace(Ciphertext<Element>& ciphertext1, ConstCiphertext<Element> ciphertext2) const;
+    void EvalLazyAddCoreInPlace(Ciphertext<Element>& ciphertext1, ConstCiphertext<Element> ciphertext2) const;
 
     virtual Ciphertext<Element> EvalSubCore(ConstCiphertext<Element> ciphertext1,
                                             ConstCiphertext<Element> ciphertext2) const;
+    virtual Ciphertext<Element> EvalLazySubCore(ConstCiphertext<Element> ciphertext1,
+                                            ConstCiphertext<Element> ciphertext2) const;
+
 
     /**
    * Internal function for in-place homomorphic addition of ciphertexts.
@@ -842,7 +856,7 @@ protected:
    * input ciphertexts.
    */
     void EvalSubCoreInPlace(Ciphertext<Element>& ciphertext1, ConstCiphertext<Element> ciphertext2) const;
-
+    void EvalLazySubCoreInPlace(Ciphertext<Element>& ciphertext1, ConstCiphertext<Element> ciphertext2) const;
     /**
    * Internal function for homomorphic multiplication of ciphertexts.
    * This method does not check whether input ciphertexts are

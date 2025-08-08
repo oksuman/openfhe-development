@@ -425,6 +425,7 @@ bool CKKSPackedEncoding::Encode() {
 
 bool CKKSPackedEncoding::Decode(size_t noiseScaleDeg, double scalingFactor, ScalingTechnique scalTech,
                                 ExecutionMode executionMode) {
+
     double p       = encodingParams->GetPlaintextModulus();
     double powP    = 0.0;
     uint32_t Nh    = GetElementRingDimension() / 2;

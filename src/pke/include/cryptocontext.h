@@ -1383,6 +1383,11 @@ public:
         return GetScheme()->EvalAdd(ciphertext1, ciphertext2);
     }
 
+    Ciphertext<Element> EvalLazyAdd(ConstCiphertext<Element> ciphertext1, ConstCiphertext<Element> ciphertext2) const {
+        TypeCheck(ciphertext1, ciphertext2);
+        return GetScheme()->EvalLazyAdd(ciphertext1, ciphertext2);
+    }
+
     /**
    * In-place homomorphic addition of two ciphertexts
    * @param ciphertext1 first addend
@@ -1392,6 +1397,10 @@ public:
     void EvalAddInPlace(Ciphertext<Element>& ciphertext1, ConstCiphertext<Element> ciphertext2) const {
         TypeCheck(ciphertext1, ciphertext2);
         GetScheme()->EvalAddInPlace(ciphertext1, ciphertext2);
+    }
+    void EvalLazyAddInPlace(Ciphertext<Element>& ciphertext1, ConstCiphertext<Element> ciphertext2) const {
+        TypeCheck(ciphertext1, ciphertext2);
+        GetScheme()->EvalLazyAddInPlace(ciphertext1, ciphertext2);
     }
 
     /**
@@ -1561,6 +1570,10 @@ public:
         TypeCheck(ciphertext1, ciphertext2);
         return GetScheme()->EvalSub(ciphertext1, ciphertext2);
     }
+    Ciphertext<Element> EvalLazySub(ConstCiphertext<Element> ciphertext1, ConstCiphertext<Element> ciphertext2) const {
+        TypeCheck(ciphertext1, ciphertext2);
+        return GetScheme()->EvalLazySub(ciphertext1, ciphertext2);
+    }
 
     /**
    * In-place homomorphic subtraction of two ciphertexts
@@ -1571,6 +1584,10 @@ public:
     void EvalSubInPlace(Ciphertext<Element>& ciphertext1, ConstCiphertext<Element> ciphertext2) const {
         TypeCheck(ciphertext1, ciphertext2);
         GetScheme()->EvalSubInPlace(ciphertext1, ciphertext2);
+    }
+    void EvalLazySubInPlace(Ciphertext<Element>& ciphertext1, ConstCiphertext<Element> ciphertext2) const {
+        TypeCheck(ciphertext1, ciphertext2);
+        GetScheme()->EvalLazySubInPlace(ciphertext1, ciphertext2);
     }
 
     /**

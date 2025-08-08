@@ -46,6 +46,7 @@ DecryptResult PKECKKSRNS::Decrypt(ConstCiphertext<DCRTPoly> ciphertext, const Pr
     const auto cryptoParams = std::dynamic_pointer_cast<CryptoParametersCKKSRNS>(ciphertext->GetCryptoParameters());
     const std::vector<DCRTPoly>& cv = ciphertext->GetElements();
     DCRTPoly b                      = DecryptCore(cv, privateKey);
+
     if (cryptoParams->GetDecryptionNoiseMode() == NOISE_FLOODING_DECRYPT &&
         cryptoParams->GetExecutionMode() == EXEC_EVALUATION) {
         auto dgg = cryptoParams->GetFloodingDiscreteGaussianGenerator();
@@ -73,7 +74,7 @@ DecryptResult PKECKKSRNS::Decrypt(ConstCiphertext<DCRTPoly> ciphertext, const Pr
     const std::vector<DCRTPoly>& cv = ciphertext->GetElements();
     DCRTPoly b                      = DecryptCore(cv, privateKey);
     if (cryptoParams->GetDecryptionNoiseMode() == NOISE_FLOODING_DECRYPT &&
-        cryptoParams->GetExecutionMode() == EXEC_EVALUATION) {
+    cryptoParams->GetExecutionMode() == EXEC_EVALUATION) {
         auto dgg = cryptoParams->GetFloodingDiscreteGaussianGenerator();
         DCRTPoly noise(dgg, cv[0].GetParams(), Format::EVALUATION);
         b += noise;
@@ -81,17 +82,17 @@ DecryptResult PKECKKSRNS::Decrypt(ConstCiphertext<DCRTPoly> ciphertext, const Pr
 
     b.SetFormat(Format::COEFFICIENT);
     const size_t sizeQl = b.GetParams()->GetParams().size();
-
+    
     if (sizeQl == 0)
-        OPENFHE_THROW("Decryption failure: No towers left; consider increasing the depth.");
-
+    OPENFHE_THROW("Decryption failure: No towers left; consider increasing the depth.");
+    
     if (sizeQl == 1) {
         *plaintext = Poly(b.GetElementAtIndex(0), Format::COEFFICIENT);
     }
     else {
         *plaintext = b.CRTInterpolate();
     }
-
+    
     return DecryptResult(plaintext->GetLength());
 }
 
