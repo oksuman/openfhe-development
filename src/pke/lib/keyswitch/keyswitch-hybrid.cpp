@@ -47,14 +47,12 @@ namespace lbcrypto {
 
 EvalKey<DCRTPoly> KeySwitchHYBRID::KeySwitchGenInternal(const PrivateKey<DCRTPoly> oldKey,
                                                        const PrivateKey<DCRTPoly> newKey) const {
-   std::cout << "Using KeySwitchHYBRID::KeySwitchGenInternal (2 keys)" << std::endl;
    return KeySwitchHYBRID::KeySwitchGenInternal(oldKey, newKey, nullptr);
 }
 
 EvalKey<DCRTPoly> KeySwitchHYBRID::KeySwitchGenInternal(const PrivateKey<DCRTPoly> oldKey,
                                                        const PrivateKey<DCRTPoly> newKey,
                                                        const EvalKey<DCRTPoly> ekPrev) const {
-   std::cout << "Using KeySwitchHYBRID::KeySwitchGenInternal (3 params)" << std::endl;
    
    if(oldKey == nullptr) {
        std::cout << "Error: oldKey is nullptr" << std::endl;
@@ -87,24 +85,19 @@ EvalKey<DCRTPoly> KeySwitchHYBRID::KeySwitchGenInternal(const PrivateKey<DCRTPol
    }
 
    size_t sizeQ = paramsQ->GetParams().size();
-   std::cout << "Debug: sizeQ = " << sizeQ << std::endl;
    
    size_t sizeQP = paramsQP->GetParams().size();
-   std::cout << "Debug: sizeQP = " << sizeQP << std::endl;
 
    DCRTPoly sOld = oldKey->GetPrivateElement();
    DCRTPoly sNew = newKey->GetPrivateElement().Clone();
 
    sNew.SetFormat(Format::COEFFICIENT);
-   std::cout << "Debug: Set sNew format to COEFFICIENT" << std::endl;
 
    DCRTPoly sNewExt(paramsQP, Format::COEFFICIENT, true);
-   std::cout << "Debug: Created sNewExt" << std::endl;
 
    for (size_t i = 0; i < sizeQ; i++) {
        sNewExt.SetElementAtIndex(i, sNew.GetElementAtIndex(i));
    }
-   std::cout << "Debug: Filled sNewExt with Q part" << std::endl;
 
    for (size_t j = sizeQ; j < sizeQP; j++) {
        const NativeInteger& pj = paramsQP->GetParams()[j]->GetModulus();
@@ -113,28 +106,23 @@ EvalKey<DCRTPoly> KeySwitchHYBRID::KeySwitchGenInternal(const PrivateKey<DCRTPol
        sNew0.SwitchModulus(pj, rootj, 0, 0);
        sNewExt.SetElementAtIndex(j, std::move(sNew0));
    }
-   std::cout << "Debug: Filled sNewExt with P part" << std::endl;
 
    sNewExt.SetFormat(Format::EVALUATION);
-   std::cout << "Debug: Set sNewExt format to EVALUATION" << std::endl;
 
    const auto ns = cryptoParams->GetNoiseScale();
    const DggType& dgg = cryptoParams->GetDiscreteGaussianGenerator();
    DugType dug;
 
    size_t numPartQ = cryptoParams->GetNumPartQ();
-   std::cout << "Debug: numPartQ = " << numPartQ << std::endl;
 
    std::vector<DCRTPoly> av(numPartQ);
    std::vector<DCRTPoly> bv(numPartQ);
 
    std::vector<NativeInteger> PModq = cryptoParams->GetPModq();
    size_t numPerPartQ = cryptoParams->GetNumPerPartQ();
-   std::cout << "Debug: numPerPartQ = " << numPerPartQ << std::endl;
 
    for (size_t part = 0; part < numPartQ; ++part) {
-       std::cout << "Debug: Processing part " << part << std::endl;
-       
+
        DCRTPoly a = (ekPrev == nullptr) ? 
                     DCRTPoly(dug, paramsQP, Format::EVALUATION) :  // single-key HE
                     ekPrev->GetAVector()[part];                    // threshold HE
@@ -146,7 +134,6 @@ EvalKey<DCRTPoly> KeySwitchHYBRID::KeySwitchGenInternal(const PrivateKey<DCRTPol
        size_t endPartIdx = (sizeQ > (startPartIdx + numPerPartQ)) ? 
                          (startPartIdx + numPerPartQ) : sizeQ;
        
-       std::cout << "Debug: startPartIdx = " << startPartIdx << ", endPartIdx = " << endPartIdx << std::endl;
 
        for (size_t i = 0; i < sizeQP; ++i) {
            auto ai = a.GetElementAtIndex(i);
@@ -161,24 +148,20 @@ EvalKey<DCRTPoly> KeySwitchHYBRID::KeySwitchGenInternal(const PrivateKey<DCRTPol
                b.SetElementAtIndex(i, -ai * sNewi + PModq[i] * sOldi + ns * ei);
            }
        }
-       std::cout << "Debug: Completed inner loop for part " << part << std::endl;
 
        av[part] = a;
        bv[part] = b;
    }
-   std::cout << "Debug: Completed all parts" << std::endl;
 
    ek->SetAVector(std::move(av));
    ek->SetBVector(std::move(bv));
    ek->SetKeyTag(newKey->GetKeyTag());
-   std::cout << "Debug: Set vectors in ek" << std::endl;
-   
+
    return ek;
 }
 
 EvalKey<DCRTPoly> KeySwitchHYBRID::KeySwitchGenInternal(const PrivateKey<DCRTPoly> oldKey,
                                                        const PublicKey<DCRTPoly> newKey) const {
-   std::cout << "Using KeySwitchHYBRID::KeySwitchGenInternal (oldKey, newPubKey)" << std::endl;
    
    if(oldKey == nullptr) {
        std::cout << "Error: oldKey is nullptr" << std::endl;
@@ -211,10 +194,9 @@ EvalKey<DCRTPoly> KeySwitchHYBRID::KeySwitchGenInternal(const PrivateKey<DCRTPol
    }
 
    usint sizeQ = paramsQ->GetParams().size();
-   std::cout << "Debug: sizeQ = " << sizeQ << std::endl;
+
    
    usint sizeQP = paramsQP->GetParams().size();
-   std::cout << "Debug: sizeQP = " << sizeQP << std::endl;
 
    DCRTPoly sOld = oldKey->GetPrivateElement();
    if(sOld.GetNumOfElements() == 0) {
@@ -230,17 +212,14 @@ EvalKey<DCRTPoly> KeySwitchHYBRID::KeySwitchGenInternal(const PrivateKey<DCRTPol
    TugType tug;
 
    auto numPartQ = cryptoParams->GetNumPartQ();
-   std::cout << "Debug: numPartQ = " << numPartQ << std::endl;
 
    std::vector<DCRTPoly> av(numPartQ);
    std::vector<DCRTPoly> bv(numPartQ);
 
    std::vector<NativeInteger> PModq = cryptoParams->GetPModq();
    usint numPerPartQ = cryptoParams->GetNumPerPartQ();
-   std::cout << "Debug: numPerPartQ = " << numPerPartQ << std::endl;
 
    for (usint part = 0; part < numPartQ; part++) {
-       std::cout << "Debug: Processing part " << part << std::endl;
        
        DCRTPoly u = (cryptoParams->GetSecretKeyDist() == GAUSSIAN) ? 
                     DCRTPoly(dgg, paramsQP, Format::EVALUATION) :
@@ -256,7 +235,6 @@ EvalKey<DCRTPoly> KeySwitchHYBRID::KeySwitchGenInternal(const PrivateKey<DCRTPol
        usint endPartIdx = (sizeQ > startPartIdx + numPerPartQ) ? 
                         (startPartIdx + numPerPartQ) : sizeQ;
        
-       std::cout << "Debug: startPartIdx = " << startPartIdx << ", endPartIdx = " << endPartIdx << std::endl;
 
        for (usint i = 0; i < sizeQP; i++) {
            auto e0i = e0.GetElementAtIndex(i);
@@ -277,23 +255,20 @@ EvalKey<DCRTPoly> KeySwitchHYBRID::KeySwitchGenInternal(const PrivateKey<DCRTPol
                b.SetElementAtIndex(i, newp0i * ui + ns * e0i + PModq[i] * sOldi);
            }
        }
-       std::cout << "Debug: Completed inner loop for part " << part << std::endl;
 
        av[part] = a;
        bv[part] = b;
    }
-   std::cout << "Debug: Completed all parts" << std::endl;
 
    ek->SetAVector(std::move(av));
    ek->SetBVector(std::move(bv));
    ek->SetKeyTag(newKey->GetKeyTag());
-   std::cout << "Debug: Set vectors in ek" << std::endl;
+
 
    return ek;
 }
 
 void KeySwitchHYBRID::KeySwitchInPlace(Ciphertext<DCRTPoly>& ciphertext, const EvalKey<DCRTPoly> ek) const {
-   std::cout << "Using KeySwitchHYBRID::KeySwitchInPlace" << std::endl;
    
    if(ciphertext == nullptr) {
        std::cout << "Error: ciphertext is nullptr" << std::endl;
@@ -310,15 +285,12 @@ void KeySwitchHYBRID::KeySwitchInPlace(Ciphertext<DCRTPoly>& ciphertext, const E
        std::cout << "Error: ciphertext elements vector is empty" << std::endl;
        OPENFHE_THROW("ciphertext elements vector is empty");
    }
-   
-   std::cout << "Debug: ciphertext size = " << cv.size() << std::endl;
+
    
    std::shared_ptr<std::vector<DCRTPoly>> ba;
    if(cv.size() == 2) {
-       std::cout << "Debug: Calling KeySwitchCore with cv[1]" << std::endl;
        ba = KeySwitchCore(cv[1], ek);
    } else {
-       std::cout << "Debug: Calling KeySwitchCore with cv[2]" << std::endl;
        ba = KeySwitchCore(cv[2], ek);
    }
    
@@ -343,11 +315,9 @@ void KeySwitchHYBRID::KeySwitchInPlace(Ciphertext<DCRTPoly>& ciphertext, const E
        cv[1] = (*ba)[1];
    }
    cv.resize(2);
-   std::cout << "Debug: KeySwitchInPlace completed" << std::endl;
 }
 
 Ciphertext<DCRTPoly> KeySwitchHYBRID::KeySwitchExt(ConstCiphertext<DCRTPoly> ciphertext, bool addFirst) const {
-   std::cout << "Using KeySwitchHYBRID::KeySwitchExt" << std::endl;
    
    if(ciphertext == nullptr) {
        std::cout << "Error: ciphertext is nullptr" << std::endl;
@@ -385,10 +355,8 @@ Ciphertext<DCRTPoly> KeySwitchHYBRID::KeySwitchExt(ConstCiphertext<DCRTPoly> cip
    }
 
    size_t sizeQl = paramsQl->GetParams().size();
-   std::cout << "Debug: sizeQl = " << sizeQl << std::endl;
    
    usint sizeCv = cv.size();
-   std::cout << "Debug: sizeCv = " << sizeCv << std::endl;
    
    std::vector<DCRTPoly> resultElements(sizeCv);
    for (usint k = 0; k < sizeCv; k++) {
@@ -406,16 +374,12 @@ Ciphertext<DCRTPoly> KeySwitchHYBRID::KeySwitchExt(ConstCiphertext<DCRTPoly> cip
            }
        }
    }
-   std::cout << "Debug: Created result elements" << std::endl;
-
    Ciphertext<DCRTPoly> result = ciphertext->CloneZero();
    result->SetElements(std::move(resultElements));
-   std::cout << "Debug: KeySwitchExt completed" << std::endl;
    return result;
 }
 
 Ciphertext<DCRTPoly> KeySwitchHYBRID::KeySwitchDown(ConstCiphertext<DCRTPoly> ciphertext) const {
-   std::cout << "Using KeySwitchHYBRID::KeySwitchDown" << std::endl;
    
    if(ciphertext == nullptr) {
        std::cout << "Error: ciphertext is nullptr" << std::endl;
@@ -448,7 +412,6 @@ Ciphertext<DCRTPoly> KeySwitchHYBRID::KeySwitchDown(ConstCiphertext<DCRTPoly> ci
        rootsQ[i] = paramsQlP->GetParams()[i]->GetRootOfUnity();
    }
    auto paramsQl = std::make_shared<typename DCRTPoly::Params>(2 * paramsQlP->GetRingDimension(), moduliQ, rootsQ);
-   std::cout << "Debug: Created paramsQl" << std::endl;
 
    auto cTilda = ciphertext->GetElements();
 
@@ -465,16 +428,13 @@ Ciphertext<DCRTPoly> KeySwitchHYBRID::KeySwitchDown(ConstCiphertext<DCRTPoly> ci
                                           cryptoParams->GetPHatInvModpPrecon(), cryptoParams->GetPHatModq(),
                                           cryptoParams->GetModqBarrettMu(), cryptoParams->GettInvModp(),
                                           cryptoParams->GettInvModpPrecon(), t, cryptoParams->GettModqPrecon());
-   std::cout << "Debug: Performed ApproxModDown" << std::endl;
 
    Ciphertext<DCRTPoly> result = ciphertext->CloneZero();
    result->SetElements(std::vector<DCRTPoly>{std::move(ct0), std::move(ct1)});
-   std::cout << "Debug: KeySwitchDown completed" << std::endl;
    return result;
 }
 
 DCRTPoly KeySwitchHYBRID::KeySwitchDownFirstElement(ConstCiphertext<DCRTPoly> ciphertext) const {
-   std::cout << "Using KeySwitchHYBRID::KeySwitchDownFirstElement" << std::endl;
    
    if(ciphertext == nullptr) {
        std::cout << "Error: ciphertext is nullptr" << std::endl;
@@ -513,7 +473,6 @@ DCRTPoly KeySwitchHYBRID::KeySwitchDownFirstElement(ConstCiphertext<DCRTPoly> ci
        rootsQ[i] = paramsQlP->GetParams()[i]->GetRootOfUnity();
    }
    auto paramsQl = std::make_shared<typename DCRTPoly::Params>(2 * paramsQlP->GetRingDimension(), moduliQ, rootsQ);
-   std::cout << "Debug: Created paramsQl" << std::endl;
 
    PlaintextModulus t = (cryptoParams->GetNoiseScale() == 1) ? 0 : cryptoParams->GetPlaintextModulus();
 
@@ -522,14 +481,12 @@ DCRTPoly KeySwitchHYBRID::KeySwitchDownFirstElement(ConstCiphertext<DCRTPoly> ci
                                           cryptoParams->GetPHatInvModpPrecon(), cryptoParams->GetPHatModq(),
                                           cryptoParams->GetModqBarrettMu(), cryptoParams->GettInvModp(),
                                           cryptoParams->GettInvModpPrecon(), t, cryptoParams->GettModqPrecon());
-   std::cout << "Debug: KeySwitchDownFirstElement completed" << std::endl;
 
    return cv0;
 }
 
 std::shared_ptr<std::vector<DCRTPoly>> KeySwitchHYBRID::KeySwitchCore(const DCRTPoly& a,
                                                                      const EvalKey<DCRTPoly> evalKey) const {
-   std::cout << "Using KeySwitchHYBRID::KeySwitchCore" << std::endl;
    
    if(evalKey == nullptr) {
        std::cout << "Error: evalKey is nullptr" << std::endl;
@@ -542,7 +499,15 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchHYBRID::KeySwitchCore(const DCRT
        OPENFHE_THROW("cryptoParams from evalKey is nullptr");
    }
    
-   auto digits = EvalKeySwitchPrecomputeCore(a, cryptoParams);
+    // === Timing ===
+    auto start = std::chrono::high_resolution_clock::now();
+    auto digits = EvalKeySwitchPrecomputeCore(a, cryptoParams);
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration_us = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+    ksprofile::AddModUp(duration_us / 1000.0);  // ModUp + decomposition
+    // std::cout << "[TIMING] Digit decomposition took " << duration_us / 1000.0 << " ms" << std::endl;
+    // === Timing ===
+
    if(digits == nullptr) {
        std::cout << "Error: EvalKeySwitchPrecomputeCore returned nullptr" << std::endl;
        OPENFHE_THROW("EvalKeySwitchPrecomputeCore returned nullptr");
@@ -559,7 +524,6 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchHYBRID::KeySwitchCore(const DCRT
 
 std::shared_ptr<std::vector<DCRTPoly>> KeySwitchHYBRID::EvalKeySwitchPrecomputeCore(
     const DCRTPoly& c, std::shared_ptr<CryptoParametersBase<DCRTPoly>> cryptoParamsBase) const {
-    std::cout << "Using KeySwitchHYBRID::EvalKeySwitchPrecomputeCore" << std::endl;
     
     if(cryptoParamsBase == nullptr) {
         std::cout << "Error: cryptoParamsBase is nullptr" << std::endl;
@@ -591,31 +555,24 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchHYBRID::EvalKeySwitchPrecomputeC
     }
  
     size_t sizeQl = paramsQl->GetParams().size();
-    std::cout << "Debug: sizeQl = " << sizeQl << std::endl;
  
     size_t sizeP = paramsP->GetParams().size();
-    std::cout << "Debug: sizeP = " << sizeP << std::endl;
- 
+
     size_t sizeQlP = sizeQl + sizeP;
-    std::cout << "Debug: sizeQlP = " << sizeQlP << std::endl;
  
     uint32_t alpha = cryptoParams->GetNumPerPartQ();
-    std::cout << "Debug: alpha = " << alpha << std::endl;
  
     // The number of digits of the current ciphertext
     uint32_t numPartQl = ceil((static_cast<double>(sizeQl)) / alpha);
     if (numPartQl > cryptoParams->GetNumberOfQPartitions()) {
         numPartQl = cryptoParams->GetNumberOfQPartitions();
     }
-    std::cout << "Debug: numPartQl = " << numPartQl << std::endl;
  
     std::vector<DCRTPoly> partsCt(numPartQl);
-    std::cout << "Debug: Created partsCt with size " << numPartQl << std::endl;
- 
+
     // Digit decomposition
     // Zero-padding and split
     for (uint32_t part = 0; part < numPartQl; part++) {
-        std::cout << "Debug: Processing digit decomposition part " << part << std::endl;
         
         if (part == numPartQl - 1) {
             auto paramsPartQ = cryptoParams->GetParamsPartQ(part);
@@ -625,7 +582,6 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchHYBRID::EvalKeySwitchPrecomputeC
             }
  
             uint32_t sizePartQl = sizeQl - alpha * part;
-            std::cout << "Debug: sizePartQl = " << sizePartQl << std::endl;
  
             std::vector<NativeInteger> moduli(sizePartQl);
             std::vector<NativeInteger> roots(sizePartQl);
@@ -651,7 +607,6 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchHYBRID::EvalKeySwitchPrecomputeC
  
         usint sizePartQl = partsCt[part].GetNumOfElements();
         usint startPartIdx = alpha * part;
-        std::cout << "Debug: sizePartQl = " << sizePartQl << ", startPartIdx = " << startPartIdx << std::endl;
         
         for (uint32_t i = 0, idx = startPartIdx; i < sizePartQl; i++, idx++) {
             if(idx >= c.GetNumOfElements()) {
@@ -662,13 +617,11 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchHYBRID::EvalKeySwitchPrecomputeC
             partsCt[part].SetElementAtIndex(i, c.GetElementAtIndex(idx));
         }
     }
-    std::cout << "Debug: Completed digit decomposition" << std::endl;
  
     std::vector<DCRTPoly> partsCtCompl(numPartQl);
     std::vector<DCRTPoly> partsCtExt(numPartQl);
  
     for (uint32_t part = 0; part < numPartQl; part++) {
-        std::cout << "Debug: Processing CRT basis switching part " << part << std::endl;
         
         auto partCtClone = partsCt[part].Clone();
         partCtClone.SetFormat(Format::COEFFICIENT);
@@ -694,14 +647,12 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchHYBRID::EvalKeySwitchPrecomputeC
              cryptoParams->GetmodComplPartqBarrettMu(sizeQl - 1, part));
  
         partsCtCompl[part].SetFormat(Format::EVALUATION);
-        std::cout << "Debug: Completed ApproxSwitchCRTBasis for part " << part << std::endl;
  
         partsCtExt[part] = DCRTPoly(paramsQlP, Format::EVALUATION, true);
  
         usint startPartIdx = alpha * part;
         usint endPartIdx = startPartIdx + sizePartQl;
         
-        std::cout << "Debug: startPartIdx = " << startPartIdx << ", endPartIdx = " << endPartIdx << std::endl;
         
         for (usint i = 0; i < startPartIdx; i++) {
             partsCtExt[part].SetElementAtIndex(i, partsCtCompl[part].GetElementAtIndex(i));
@@ -713,7 +664,6 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchHYBRID::EvalKeySwitchPrecomputeC
             partsCtExt[part].SetElementAtIndex(i, partsCtCompl[part].GetElementAtIndex(i - sizePartQl));
         }
     }
-    std::cout << "Debug: EvalKeySwitchPrecomputeCore completed" << std::endl;
  
     return std::make_shared<std::vector<DCRTPoly>>(std::move(partsCtExt));
  }
@@ -743,48 +693,54 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchHYBRID::EvalKeySwitchPrecomputeC
         OPENFHE_THROW("cryptoParams is nullptr");
     }
  
-    std::shared_ptr<std::vector<DCRTPoly>> cTilda = EvalFastKeySwitchCoreExt(digits, evalKey, paramsQl);
+       // --- Inner product Timing ---
+    auto start_ks = std::chrono::high_resolution_clock::now();
+    std::shared_ptr<std::vector<DCRTPoly>> cTilda =
+        EvalFastKeySwitchCoreExt(digits, evalKey, paramsQl);
+    auto end_ks = std::chrono::high_resolution_clock::now();
+    auto duration_ks = std::chrono::duration_cast<std::chrono::microseconds>(end_ks - start_ks).count();
+    ksprofile::AddInner(duration_ks / 1000.0);
+    // std::cout << "[TIMING] EvalFastKeySwitchCoreExt took " << duration_ks / 1000.0 << " ms" << std::endl;
+    
     if(cTilda == nullptr) {
         std::cout << "Error: EvalFastKeySwitchCoreExt returned nullptr" << std::endl;
         OPENFHE_THROW("EvalFastKeySwitchCoreExt returned nullptr");
     }
     
-    std::cout << "Debug: Before ModDown, cTilda size = " << cTilda->size() << std::endl;
     if(cTilda->size() < 2) {
         std::cout << "Error: cTilda has size " << cTilda->size() << " (expected at least 2)" << std::endl;
         OPENFHE_THROW("cTilda has insufficient size");
     }
  
     PlaintextModulus t = (cryptoParams->GetNoiseScale() == 1) ? 0 : cryptoParams->GetPlaintextModulus();
- 
-    std::cout << "Debug: Before ApproxModDown call for ct0" << std::endl;
-    std::cout << "Debug: (*cTilda)[0] elements: " << (*cTilda)[0].GetNumOfElements() << std::endl;
+
     
+    // --- Mod down Timing ---
+    auto start_moddown = std::chrono::high_resolution_clock::now();
     DCRTPoly ct0 = (*cTilda)[0].ApproxModDown(paramsQl, cryptoParams->GetParamsP(), cryptoParams->GetPInvModq(),
-                                          cryptoParams->GetPInvModqPrecon(), cryptoParams->GetPHatInvModp(),
-                                          cryptoParams->GetPHatInvModpPrecon(), cryptoParams->GetPHatModq(),
-                                          cryptoParams->GetModqBarrettMu(), cryptoParams->GettInvModp(),
-                                          cryptoParams->GettInvModpPrecon(), t, cryptoParams->GettModqPrecon());
- 
-    std::cout << "Debug: Before ApproxModDown call for ct1" << std::endl;
-    std::cout << "Debug: (*cTilda)[1] elements: " << (*cTilda)[1].GetNumOfElements() << std::endl;
-    
+                                            cryptoParams->GetPInvModqPrecon(), cryptoParams->GetPHatInvModp(),
+                                            cryptoParams->GetPHatInvModpPrecon(), cryptoParams->GetPHatModq(),
+                                            cryptoParams->GetModqBarrettMu(), cryptoParams->GettInvModp(),
+                                            cryptoParams->GettInvModpPrecon(), t, cryptoParams->GettModqPrecon());
+
     DCRTPoly ct1 = (*cTilda)[1].ApproxModDown(paramsQl, cryptoParams->GetParamsP(), cryptoParams->GetPInvModq(),
-                                          cryptoParams->GetPInvModqPrecon(), cryptoParams->GetPHatInvModp(),
-                                          cryptoParams->GetPHatInvModpPrecon(), cryptoParams->GetPHatModq(),
-                                          cryptoParams->GetModqBarrettMu(), cryptoParams->GettInvModp(),
-                                          cryptoParams->GettInvModpPrecon(), t, cryptoParams->GettModqPrecon());
-    std::cout << "Debug: EvalFastKeySwitchCore completed" << std::endl;
- 
-    auto result = std::make_shared<std::vector<DCRTPoly>>(std::initializer_list<DCRTPoly>{std::move(ct0), std::move(ct1)});
-    std::cout << "Debug: Created result vector with size " << result->size() << std::endl;
-    return result;
+                                            cryptoParams->GetPInvModqPrecon(), cryptoParams->GetPHatInvModp(),
+                                            cryptoParams->GetPHatInvModpPrecon(), cryptoParams->GetPHatModq(),
+                                            cryptoParams->GetModqBarrettMu(), cryptoParams->GettInvModp(),
+                                            cryptoParams->GettInvModpPrecon(), t, cryptoParams->GettModqPrecon());
+
+    auto end_moddown = std::chrono::high_resolution_clock::now();
+    auto duration_moddown =
+        std::chrono::duration_cast<std::chrono::microseconds>(end_moddown - start_moddown).count();
+    ksprofile::AddModDown(duration_moddown / 1000.0);
+    // std::cout << "[TIMING] ApproxModDown (both elements) took " << duration_moddown / 1000.0 << " ms" << std::endl;
+
+    return std::make_shared<std::vector<DCRTPoly>>(std::initializer_list<DCRTPoly>{std::move(ct0), std::move(ct1)});
  }
  
  std::shared_ptr<std::vector<DCRTPoly>> KeySwitchHYBRID::EvalFastKeySwitchCoreExt(
     const std::shared_ptr<std::vector<DCRTPoly>> digits, const EvalKey<DCRTPoly> evalKey,
     const std::shared_ptr<ParmType> paramsQl) const {
-    std::cout << "Using KeySwitchHYBRID::EvalFastKeySwitchCoreExt" << std::endl;
  
     if(digits == nullptr) {
         std::cout << "Error: digits is nullptr" << std::endl;
@@ -833,19 +789,15 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchHYBRID::EvalKeySwitchPrecomputeC
     }
  
     size_t sizeQl = paramsQl->GetParams().size();
-    std::cout << "Debug: sizeQl = " << sizeQl << std::endl;
  
     size_t sizeQlP = paramsQlP->GetParams().size();
-    std::cout << "Debug: sizeQlP = " << sizeQlP << std::endl;
  
     size_t sizeQ = cryptoParams->GetElementParams()->GetParams().size();
-    std::cout << "Debug: sizeQ = " << sizeQ << std::endl;
- 
+
     DCRTPoly cTilda0(paramsQlP, Format::EVALUATION, true);
     DCRTPoly cTilda1(paramsQlP, Format::EVALUATION, true);
  
     for (uint32_t j = 0; j < digits->size(); j++) {
-        std::cout << "Debug: Processing digit " << j << " of " << digits->size() << std::endl;
         
         if(j >= bv.size()) {
             std::cout << "Error: j=" << j << " is out of bounds for bv (size=" << bv.size() << ")" << std::endl;
@@ -880,27 +832,16 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchHYBRID::EvalKeySwitchPrecomputeC
         }
     }
     
-    std::cout << "Debug: Final state check in EvalFastKeySwitchCoreExt" << std::endl;
-    std::cout << "Debug: cTilda0 elements: " << cTilda0.GetNumOfElements() 
-              << ", format: " << static_cast<int>(cTilda0.GetFormat()) << std::endl;
-    std::cout << "Debug: cTilda1 elements: " << cTilda1.GetNumOfElements() 
-              << ", format: " << static_cast<int>(cTilda1.GetFormat()) << std::endl;
-    
     if(cTilda0.GetNumOfElements() > 0) {
         auto firstElement = cTilda0.GetElementAtIndex(0);
-        std::cout << "Debug: cTilda0 first element isValid: " << !firstElement.IsEmpty() << std::endl;
     }
     
     if(cTilda1.GetNumOfElements() > 0) {
         auto firstElement = cTilda1.GetElementAtIndex(0);
-        std::cout << "Debug: cTilda1 first element isValid: " << !firstElement.IsEmpty() << std::endl;
     }
     
     auto result = std::make_shared<std::vector<DCRTPoly>>(
         std::initializer_list<DCRTPoly>{cTilda0, cTilda1});
-    std::cout << "Debug: Result vector created with size: " << result->size() << std::endl;
-    
-    std::cout << "Debug: EvalFastKeySwitchCoreExt completed" << std::endl;
  
     return result;
  }

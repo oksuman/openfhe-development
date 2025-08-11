@@ -18,6 +18,7 @@ set(PKE_VERSION ${PKE_VERSION_MAJOR}.${PKE_VERSION_MINOR}.${PKE_VERSION_PATCH})
 add_library (pkeobj OBJECT ${PKE_SRC_FILES})
 set_property(TARGET pkeobj PROPERTY POSITION_INDEPENDENT_CODE 1)
 
+
 if( BUILD_SHARED )
 	add_dependencies(pkeobj OPENFHEcore OPENFHEbinfhe)
 	add_library (OPENFHEpke SHARED $<TARGET_OBJECTS:pkeobj>)

@@ -2,6 +2,7 @@
 #define LBCRYPTO_CRYPTO_KEYSWITCH_BATCHED_H
 
 #include "keyswitch/keyswitch-rns.h"
+#include "keyswitch/keyswitch-profile.h"
 #include "schemebase/rlwe-cryptoparameters.h"
 
 #include <string>

@@ -705,12 +705,12 @@ Ciphertext<Element> LeveledSHEBase<Element>::EvalLazyAtIndex(ConstCiphertext<Ele
 
 template <class Element>
 Ciphertext<Element> LeveledSHEBase<Element>::EvalBatchedKS(ConstCiphertext<Element> ciphertext) const {
-    std::cout << "EvalBatchedKS called (lazy-aware)" << std::endl;
+    // std::cout << "EvalBatchedKS called (lazy-aware)" << std::endl;
 
     const auto& elements = ciphertext->GetElements();
     const auto& keyIndices = ciphertext->GetElementKeyIndexVector();
 
-    std::cout << "key indices: " << keyIndices << std::endl;
+    // std::cout << "key indices: " << keyIndices << std::endl;
 
     if (elements.size() != keyIndices.size()) {
         std::cout << "elements size: " << elements.size() << std::endl;
