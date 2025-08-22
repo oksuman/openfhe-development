@@ -2155,12 +2155,6 @@ public:
 
         return GetScheme()->EvalLazyAtIndex(ciphertext, index);
     }
-    // Ciphertext<Element> EvalLazyRotate(ConstCiphertext<Element> ciphertext, int32_t index) const {
-    //     ValidateCiphertext(ciphertext);
-   
-    //     auto evalKeyMap = CryptoContextImpl<Element>::GetEvalAutomorphismKeyMap(ciphertext->GetKeyTag());
-    //     return GetScheme()->EvalLazyAtIndex(ciphertext, index, evalKeyMap);
-    // }
 
     Ciphertext<Element> EvalBatchedKS(ConstCiphertext<Element> ciphertext) const {
         ValidateCiphertext(ciphertext);

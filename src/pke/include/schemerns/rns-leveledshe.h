@@ -61,7 +61,9 @@ public:
     /////////////////////////////////////////
 
     using LeveledSHEBase<DCRTPoly>::EvalAdd;
+    using LeveledSHEBase<DCRTPoly>::EvalLazyAdd;
     using LeveledSHEBase<DCRTPoly>::EvalAddInPlace;
+    using LeveledSHEBase<DCRTPoly>::EvalLazyAddInPlace;
     using LeveledSHEBase<DCRTPoly>::EvalAddMutable;
     using LeveledSHEBase<DCRTPoly>::EvalAddMutableInPlace;
 
@@ -75,6 +77,8 @@ public:
    */
     Ciphertext<DCRTPoly> EvalAdd(ConstCiphertext<DCRTPoly> ciphertext1,
                                  ConstCiphertext<DCRTPoly> ciphertext2) const override;
+    Ciphertext<DCRTPoly> EvalLazyAdd(ConstCiphertext<DCRTPoly> ciphertext1,
+                                 ConstCiphertext<DCRTPoly> ciphertext2) const override;
 
     /**
    * Virtual function to define the interface for in-place homomorphic addition
@@ -84,6 +88,7 @@ public:
    * @param ciphertext2 the input ciphertext.
    */
     void EvalAddInPlace(Ciphertext<DCRTPoly>& ciphertext1, ConstCiphertext<DCRTPoly> ciphertext2) const override;
+    void EvalLazyAddInPlace(Ciphertext<DCRTPoly>& ciphertext1, ConstCiphertext<DCRTPoly> ciphertext2) const override;
 
     /**
    * Virtual function to define the interface for homomorphic addition of
@@ -159,6 +164,8 @@ public:
    */
     Ciphertext<DCRTPoly> EvalSub(ConstCiphertext<DCRTPoly> ciphertext1,
                                  ConstCiphertext<DCRTPoly> ciphertext2) const override;
+    Ciphertext<DCRTPoly> EvalLazySub(ConstCiphertext<DCRTPoly> ciphertext1,
+                                 ConstCiphertext<DCRTPoly> ciphertext2) const override;
 
     /**
    * Virtual function to define the interface for homomorphic subtraction of
@@ -168,6 +175,7 @@ public:
    * @param ciphertext2 the input ciphertext.
    */
     void EvalSubInPlace(Ciphertext<DCRTPoly>& ciphertext1, ConstCiphertext<DCRTPoly> ciphertext2) const override;
+    void EvalLazySubInPlace(Ciphertext<DCRTPoly>& ciphertext1, ConstCiphertext<DCRTPoly> ciphertext2) const override;
 
     /**
    * Virtual function to define the interface for homomorphic subtraction of

@@ -757,8 +757,11 @@ Ciphertext<DCRTPoly> LeveledSHEBFVRNS::EvalAutomorphism(ConstCiphertext<DCRTPoly
                                                         const std::map<uint32_t, EvalKey<DCRTPoly>>& evalKeyMap,
                                                         CALLER_INFO_ARGS_CPP) const {
     uint32_t N = ciphertext->GetElements()[0].GetRingDimension();
-
+    std::cout << "EvalAutomorphism called" << std::endl;
+    std::cout << "ring dimension: " << N << std::endl;
+    std::cout << "automorphism index: " << i << std::endl;
     std::vector<uint32_t> vec(N);
+    
     PrecomputeAutoMap(N, i, &vec);
 
     auto result = ciphertext->Clone();

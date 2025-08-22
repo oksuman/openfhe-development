@@ -354,8 +354,6 @@ void KeySwitchBATCHED::BatchedKeySwitchInPlace(
     const std::vector<DCRTPoly>& cvToSwitch,
     const std::vector<EvalKey<DCRTPoly>>& evalKeyVec) const {
 
-    // std::cout << "Using KeySwitchBATCHED::BatchedKeySwitchInPlace (simplified)" << std::endl;
-
     if (!ciphertext) {
         OPENFHE_THROW("ciphertext is nullptr");
     }
@@ -522,7 +520,6 @@ Ciphertext<DCRTPoly> KeySwitchBATCHED::KeySwitchDown(ConstCiphertext<DCRTPoly> c
 }
 
 DCRTPoly KeySwitchBATCHED::KeySwitchDownFirstElement(ConstCiphertext<DCRTPoly> ciphertext) const {
-    std::cout << "Using KeySwitchBATCHED::KeySwitchDownFirstElement" << std::endl;
     
     if(ciphertext == nullptr) {
         std::cout << "Error: ciphertext is nullptr" << std::endl;
@@ -655,7 +652,6 @@ KeySwitchBATCHED::BatchedKeySwitchCore(
 
 std::shared_ptr<std::vector<DCRTPoly>> KeySwitchBATCHED::EvalKeySwitchPrecomputeCore(
     const DCRTPoly& c, std::shared_ptr<CryptoParametersBase<DCRTPoly>> cryptoParamsBase) const {
-    // std::cout << "Using KeySwitchBATCHED::EvalKeySwitchPrecomputeCore" << std::endl;
     
     if(cryptoParamsBase == nullptr) {
         std::cout << "Error: cryptoParamsBase is nullptr" << std::endl;
@@ -687,31 +683,22 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchBATCHED::EvalKeySwitchPrecompute
     }
 
     size_t sizeQl = paramsQl->GetParams().size();
-    //std::cout << "Debug: sizeQl = " << sizeQl << std::endl;
 
     size_t sizeP = paramsP->GetParams().size();
-    //std::cout << "Debug: sizeP = " << sizeP << std::endl;
 
     size_t sizeQlP = sizeQl + sizeP;
-    //std::cout << "Debug: sizeQlP = " << sizeQlP << std::endl;
 
     uint32_t alpha = cryptoParams->GetNumPerPartQ();
-    //std::cout << "Debug: alpha = " << alpha << std::endl;
 
-    // The number of digits of the current ciphertext
     uint32_t numPartQl = ceil((static_cast<double>(sizeQl)) / alpha);
     if (numPartQl > cryptoParams->GetNumberOfQPartitions()) {
         numPartQl = cryptoParams->GetNumberOfQPartitions();
     }
-    //std::cout << "Debug: numPartQl = " << numPartQl << std::endl;
-
     std::vector<DCRTPoly> partsCt(numPartQl);
-    //std::cout << "Debug: Created partsCt with size " << numPartQl << std::endl;
 
     // Digit decomposition
     // Zero-padding and split
     for (uint32_t part = 0; part < numPartQl; part++) {
-        //std::cout << "Debug: Processing digit decomposition part " << part << std::endl;
         
         if (part == numPartQl - 1) {
             auto paramsPartQ = cryptoParams->GetParamsPartQ(part);
@@ -721,7 +708,6 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchBATCHED::EvalKeySwitchPrecompute
             }
 
             uint32_t sizePartQl = sizeQl - alpha * part;
-            //std::cout << "Debug: sizePartQl = " << sizePartQl << std::endl;
 
             std::vector<NativeInteger> moduli(sizePartQl);
             std::vector<NativeInteger> roots(sizePartQl);
@@ -747,8 +733,7 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchBATCHED::EvalKeySwitchPrecompute
 
         usint sizePartQl = partsCt[part].GetNumOfElements();
         usint startPartIdx = alpha * part;
-        //std::cout << "Debug: sizePartQl = " << sizePartQl << ", startPartIdx = " << startPartIdx << std::endl;
-        
+     
         for (uint32_t i = 0, idx = startPartIdx; i < sizePartQl; i++, idx++) {
             if(idx >= c.GetNumOfElements()) {
                 std::cout << "Error: idx=" << idx << " is out of bounds for c (size=" << c.GetNumOfElements() << ")" << std::endl;
@@ -758,13 +743,11 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchBATCHED::EvalKeySwitchPrecompute
             partsCt[part].SetElementAtIndex(i, c.GetElementAtIndex(idx));
         }
     }
-    //std::cout << "Debug: Completed digit decomposition" << std::endl;
 
     std::vector<DCRTPoly> partsCtCompl(numPartQl);
     std::vector<DCRTPoly> partsCtExt(numPartQl);
 
     for (uint32_t part = 0; part < numPartQl; part++) {
-        //std::cout << "Debug: Processing CRT basis switching part " << part << std::endl;
         
         auto partCtClone = partsCt[part].Clone();
         partCtClone.SetFormat(Format::COEFFICIENT);
@@ -793,14 +776,12 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchBATCHED::EvalKeySwitchPrecompute
             partQlHatModp, modComplPartqBarrettMu);
 
         partsCtCompl[part].SetFormat(Format::EVALUATION);
-        //std::cout << "Debug: Completed ApproxSwitchCRTBasis for part " << part << std::endl;
-
+    
         partsCtExt[part] = DCRTPoly(paramsQlP, Format::EVALUATION, true);
 
         usint startPartIdx = alpha * part;
         usint endPartIdx = startPartIdx + sizePartQl;
         
-        //std::cout << "Debug: startPartIdx = " << startPartIdx << ", endPartIdx = " << endPartIdx << std::endl;
         
         for (usint i = 0; i < startPartIdx; i++) {
             if(i >= partsCtCompl[part].GetNumOfElements()) {
@@ -830,7 +811,6 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchBATCHED::EvalKeySwitchPrecompute
             partsCtExt[part].SetElementAtIndex(i, partsCtCompl[part].GetElementAtIndex(adjIdx));
         }
     }
-    //std::cout << "Debug: EvalKeySwitchPrecomputeCore completed" << std::endl;
 
     return std::make_shared<std::vector<DCRTPoly>>(std::move(partsCtExt));
 }
@@ -952,7 +932,6 @@ std::shared_ptr<std::vector<std::vector<DCRTPoly>>>
 KeySwitchBATCHED::EvalBatchedKeySwitchPrecomputeCore(
     const std::vector<DCRTPoly>& cv,
     std::shared_ptr<CryptoParametersBase<DCRTPoly>> cryptoParamsBase) const {
-
         
     if (!cryptoParamsBase) {
         OPENFHE_THROW("cryptoParamsBase is nullptr");
@@ -1076,13 +1055,9 @@ KeySwitchBATCHED::EvalBatchedKeySwitchPrecomputeCore(
     return result;
 }
 
-
-
-
 std::shared_ptr<std::vector<DCRTPoly>> KeySwitchBATCHED::EvalFastKeySwitchCore(
     const std::shared_ptr<std::vector<DCRTPoly>> digits, const EvalKey<DCRTPoly> evalKey,
     const std::shared_ptr<ParmType> paramsQl) const {
-    // std::cout << "Using KeySwitchBATCHED::EvalFastKeySwitchCore" << std::endl;
 
     if(digits == nullptr) {
         std::cout << "Error: digits is nullptr" << std::endl;
@@ -1224,7 +1199,6 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchBATCHED::EvalFastBatchedKeySwitc
 std::shared_ptr<std::vector<DCRTPoly>> KeySwitchBATCHED::EvalFastKeySwitchCoreExt(
     const std::shared_ptr<std::vector<DCRTPoly>> digits, const EvalKey<DCRTPoly> evalKey,
     const std::shared_ptr<ParmType> paramsQl) const {
-    // std::cout << "Using KeySwitchBATCHED::EvalFastKeySwitchCoreExt" << std::endl;
  
     if(digits == nullptr) {
         std::cout << "Error: digits is nullptr" << std::endl;
@@ -1363,6 +1337,7 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchBATCHED::EvalFastKeySwitchCoreEx
     return result;
 }
 
+// No Parallelism
 // std::shared_ptr<std::vector<DCRTPoly>> KeySwitchBATCHED::EvalFastBatchedKeySwitchCoreExt(
 //     const std::shared_ptr<std::vector<std::vector<DCRTPoly>>>& digitsAll,
 //     const std::vector<EvalKey<DCRTPoly>>& evalKeyVec,
@@ -1514,6 +1489,8 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchBATCHED::EvalFastKeySwitchCoreEx
 //     auto result = std::make_shared<std::vector<DCRTPoly>>(std::initializer_list<DCRTPoly>{cTilda0, cTilda1});
 //     return result;
 // }
+
+
 std::shared_ptr<std::vector<DCRTPoly>> KeySwitchBATCHED::EvalFastBatchedKeySwitchCoreExt(
     const std::shared_ptr<std::vector<std::vector<DCRTPoly>>>& digitsAll,
     const std::vector<EvalKey<DCRTPoly>>& evalKeyVec,
@@ -1567,12 +1544,13 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchBATCHED::EvalFastBatchedKeySwitc
         }
         const std::vector<DCRTPoly>& bv = ek->GetBVector();
         const std::vector<DCRTPoly>& av = ek->GetAVector();
+
         if (bv.empty() || av.empty()) {
             OPENFHE_THROW("bv/av is empty");
         }
-        if (bv.size() != digits.size() || av.size() != digits.size()) {
-            OPENFHE_THROW("digit/evalKey vector size mismatch");
-        }
+        // if (bv.size() != digits.size() || av.size() != digits.size()) {
+        //     OPENFHE_THROW("digit/evalKey vector size mismatch");
+        // }
     }
 
     DCRTPoly cTilda0(paramsQlP, Format::EVALUATION, true);
@@ -1624,7 +1602,6 @@ std::shared_ptr<std::vector<DCRTPoly>> KeySwitchBATCHED::EvalFastBatchedKeySwitc
     auto result = std::make_shared<std::vector<DCRTPoly>>(std::initializer_list<DCRTPoly>{cTilda0, cTilda1});
     return result;
 }
-
 
 
 }  // namespace lbcrypto

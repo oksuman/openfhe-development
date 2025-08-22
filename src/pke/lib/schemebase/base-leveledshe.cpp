@@ -492,6 +492,8 @@ template <class Element>
 Ciphertext<Element> LeveledSHEBase<Element>::EvalAutomorphism(ConstCiphertext<Element> ciphertext, usint i,
                                                               const std::map<usint, EvalKey<Element>>& evalKeyMap,
                                                               CALLER_INFO_ARGS_CPP) const {
+    
+    
     // this operation can be performed on 2-element ciphertexts only
     if (ciphertext->NumberCiphertextElements() != 2) {
         OPENFHE_THROW("Ciphertext should be relinearized before.");
@@ -543,7 +545,7 @@ template <class Element>
 Ciphertext<Element> LeveledSHEBase<Element>::EvalLazyAutomorphism(
     ConstCiphertext<Element> ciphertext, usint i,
     CALLER_INFO_ARGS_CPP) const {
-
+ 
     const std::vector<Element>& cv = ciphertext->GetElements();
     usint N = cv[0].GetRingDimension();
 
@@ -590,6 +592,8 @@ Ciphertext<Element> LeveledSHEBase<Element>::EvalLazyAutomorphism(
         // std::cout << "rotation index: " << i << std::endl;
         // std::cout << "newDep: " << keyIndices[idx] << std::endl;
     }
+    // std::cout << "return" << std::endl; 
+
     return result;
 }
 
@@ -683,11 +687,11 @@ template <class Element>
 Ciphertext<Element> LeveledSHEBase<Element>::EvalAtIndex(ConstCiphertext<Element> ciphertext, int32_t index,
                                                          const std::map<usint, EvalKey<Element>>& evalKeyMap) const {
     const auto cc = ciphertext->GetCryptoContext();
-
+    // std::cout << "EvalAtIndex called " << std::endl;
     usint M = ciphertext->GetCryptoParameters()->GetElementParams()->GetCyclotomicOrder();
 
     uint32_t autoIndex = FindAutomorphismIndex(index, M);
-
+    // std::cout << "autoIndex: " << autoIndex << std::endl; 
     return EvalAutomorphism(ciphertext, autoIndex, evalKeyMap);
 }
 

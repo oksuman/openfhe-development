@@ -46,6 +46,12 @@ Ciphertext<DCRTPoly> LeveledSHERNS::EvalAdd(ConstCiphertext<DCRTPoly> ciphertext
     EvalAddInPlace(result, ciphertext2);
     return result;
 }
+Ciphertext<DCRTPoly> LeveledSHERNS::EvalLazyAdd(ConstCiphertext<DCRTPoly> ciphertext1,
+                                            ConstCiphertext<DCRTPoly> ciphertext2) const {
+    Ciphertext<DCRTPoly> result = ciphertext1->Clone();
+    EvalLazyAddInPlace(result, ciphertext2);
+    return result;
+}
 
 void LeveledSHERNS::EvalAddInPlace(Ciphertext<DCRTPoly>& ciphertext1, ConstCiphertext<DCRTPoly> ciphertext2) const {
     const auto cryptoParams = std::dynamic_pointer_cast<CryptoParametersRNS>(ciphertext1->GetCryptoParameters());
@@ -56,8 +62,19 @@ void LeveledSHERNS::EvalAddInPlace(Ciphertext<DCRTPoly>& ciphertext1, ConstCiphe
     else {
         auto c2 = ciphertext2->Clone();
         AdjustForAddOrSubInPlace(ciphertext1, c2);
-
         EvalAddCoreInPlace(ciphertext1, c2);
+    }
+}
+void LeveledSHERNS::EvalLazyAddInPlace(Ciphertext<DCRTPoly>& ciphertext1, ConstCiphertext<DCRTPoly> ciphertext2) const {
+    const auto cryptoParams = std::dynamic_pointer_cast<CryptoParametersRNS>(ciphertext1->GetCryptoParameters());
+
+    if (cryptoParams->GetScalingTechnique() == NORESCALE) {
+        EvalLazyAddCoreInPlace(ciphertext1, ciphertext2);
+    }
+    else {
+        auto c2 = ciphertext2->Clone();
+        AdjustForAddOrSubInPlace(ciphertext1, c2);
+        EvalLazyAddCoreInPlace(ciphertext1, c2);
     }
 }
 
@@ -117,6 +134,12 @@ Ciphertext<DCRTPoly> LeveledSHERNS::EvalSub(ConstCiphertext<DCRTPoly> ciphertext
     EvalSubInPlace(result, ciphertext2);
     return result;
 }
+Ciphertext<DCRTPoly> LeveledSHERNS::EvalLazySub(ConstCiphertext<DCRTPoly> ciphertext1,
+                                            ConstCiphertext<DCRTPoly> ciphertext2) const {
+    Ciphertext<DCRTPoly> result = ciphertext1->Clone();
+    EvalLazySubInPlace(result, ciphertext2);
+    return result;
+}
 
 void LeveledSHERNS::EvalSubInPlace(Ciphertext<DCRTPoly>& ciphertext1, ConstCiphertext<DCRTPoly> ciphertext2) const {
     const auto cryptoParams = std::dynamic_pointer_cast<CryptoParametersRNS>(ciphertext1->GetCryptoParameters());
@@ -129,6 +152,19 @@ void LeveledSHERNS::EvalSubInPlace(Ciphertext<DCRTPoly>& ciphertext1, ConstCiphe
         AdjustForAddOrSubInPlace(ciphertext1, c2);
 
         EvalSubCoreInPlace(ciphertext1, c2);
+    }
+}
+void LeveledSHERNS::EvalLazySubInPlace(Ciphertext<DCRTPoly>& ciphertext1, ConstCiphertext<DCRTPoly> ciphertext2) const {
+    const auto cryptoParams = std::dynamic_pointer_cast<CryptoParametersRNS>(ciphertext1->GetCryptoParameters());
+
+    if (cryptoParams->GetScalingTechnique() == NORESCALE) {
+        EvalLazySubCoreInPlace(ciphertext1, ciphertext2);
+    }
+    else {
+        auto c2 = ciphertext2->Clone();
+        AdjustForAddOrSubInPlace(ciphertext1, c2);
+
+        EvalLazySubCoreInPlace(ciphertext1, c2);
     }
 }
 
