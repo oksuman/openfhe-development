@@ -1033,6 +1033,11 @@ public:
     virtual Ciphertext<Element> MultipartyDecryptLead(ConstCiphertext<Element>& ciphertext,
                                                       const PrivateKey<Element> privateKey) const;
 
+    virtual Ciphertext<Element> GenPartialDec(ConstCiphertext<Element>& ciphertext,
+                                          const PrivateKey<Element> privateKey,
+                                          bool denomClear = false,
+                                          const std::string& shareType = "", uint32_t N=0) const;
+
     virtual DecryptResult MultipartyDecryptFusion(const std::vector<Ciphertext<Element>>& ciphertextVec,
                                                   NativePoly* plaintext) const {
         VerifyMultipartyEnabled(__func__);

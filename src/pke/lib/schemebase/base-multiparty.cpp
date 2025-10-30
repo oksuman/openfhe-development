@@ -267,6 +267,16 @@ Ciphertext<Element> MultipartyBase<Element>::MultipartyDecryptMain(ConstCipherte
     return result;
 }
 
+template <typename Element>
+Ciphertext<Element> MultipartyBase<Element>::GenPartialDec(
+    ConstCiphertext<Element> ciphertext,
+    const PrivateKey<Element> privateKey,
+    bool denomClear,
+    const std::string& shareType, uint32_t N) const {
+    OPENFHE_THROW("GenPartialDec is not implemented for this scheme");
+}
+
+
 template <class Element>
 DecryptResult MultipartyBase<Element>::MultipartyDecryptFusion(const std::vector<Ciphertext<Element>>& ciphertextVec,
                                                                NativePoly* plaintext) const {

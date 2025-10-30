@@ -3212,6 +3212,15 @@ public:
         return newCiphertextVec;
     }
 
+    Ciphertext<Element> GenPartialDec(ConstCiphertext<Element>& ciphertext,
+                                  const PrivateKey<Element> privateKey,
+                                  bool denomClear = false,
+                                  const std::string& shareType = "", uint32_t N=0) const {
+        ValidateKey(privateKey);
+        ValidateCiphertext(ciphertext);
+        return GetScheme()->GenPartialDec(ciphertext, privateKey, denomClear, shareType, N);
+    }
+
     /**
     * @brief Combines partially decrypted ciphertexts into the final plaintext result (Threshold FHE).
     *
@@ -3224,7 +3233,17 @@ public:
         std::string datatype = demangle(typeid(Element).name());
         OPENFHE_THROW("Not implemented for " + datatype);
     }
-
+    DecryptResult MultipartyDecryptFusionDistributed(
+        const Ciphertext<Element>& ciphertext,
+        const std::unordered_map<uint32_t, Ciphertext<Element>>& partials,
+        uint32_t threshold,
+        Plaintext* plaintext,
+        const std::string& shareType,
+        bool denomClear,
+        uint32_t N) const {
+        std::string datatype = demangle(typeid(Element).name());
+        OPENFHE_THROW("Not implemented for " + datatype);
+    }
     /**
     * @brief Generates a new joined evaluation key from a prior key and secret key shares (Threshold FHE).
     *
@@ -3537,6 +3556,9 @@ public:
         OPENFHE_THROW("Not implemented for " + datatype);
     }
 
+    std::unordered_map<uint32_t, DCRTPoly> ShareKeysDealer(const PrivateKey<DCRTPoly>& sk, uint32_t N, uint32_t threshold,
+                                                const std::string& shareType) const;
+
     /**
     * @brief Recovers a secret key share from existing shares for Threshold FHE with aborts.
     *
@@ -3547,6 +3569,8 @@ public:
     * @param shareType  Type of secret sharing ("additive" or "shamir").
     */
     void RecoverSharedKey(PrivateKey<Element>& sk, std::unordered_map<uint32_t, Element>& sk_shares, uint32_t N,
+                          uint32_t threshold, const std::string& shareType) const;
+    void RecoverSharedKeyDealer(PrivateKey<DCRTPoly>& sk, std::unordered_map<uint32_t, DCRTPoly>& sk_shares, uint32_t N,
                           uint32_t threshold, const std::string& shareType) const;
 
     //------------------------------------------------------------------------------
@@ -4069,6 +4093,16 @@ std::unordered_map<uint32_t, DCRTPoly> CryptoContextImpl<DCRTPoly>::ShareKeys(co
                                                                               uint32_t N, uint32_t threshold,
                                                                               uint32_t index,
                                                                               const std::string& shareType) const;
+
+template <>
+DecryptResult CryptoContextImpl<DCRTPoly>::MultipartyDecryptFusionDistributed(
+    const Ciphertext<DCRTPoly>& ciphertext,
+    const std::unordered_map<uint32_t, Ciphertext<DCRTPoly>>& partials,
+    uint32_t threshold,
+    Plaintext* plaintext,
+    const std::string& shareType,
+    bool denomClear,
+    uint32_t N) const;
 }  // namespace lbcrypto
 
 #endif /* SRC_PKE_CRYPTOCONTEXT_H_ */

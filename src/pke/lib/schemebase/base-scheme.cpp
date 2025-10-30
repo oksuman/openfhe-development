@@ -198,6 +198,20 @@ Ciphertext<Element> SchemeBase<Element>::MultipartyDecryptLead(ConstCiphertext<E
 }
 
 template <typename Element>
+Ciphertext<Element> SchemeBase<Element>::GenPartialDec(
+    ConstCiphertext<Element>& ciphertext,
+    const PrivateKey<Element> privateKey,
+    bool denomClear,
+    const std::string& shareType, uint32_t N) const {
+    VerifyMultipartyEnabled(__func__);
+    CheckMultipartyDecryptCompatibility(ciphertext);
+    auto result = m_Multiparty->GenPartialDec(ciphertext, privateKey, denomClear, shareType, N);
+    result->SetKeyTag(privateKey->GetKeyTag());
+    return result;
+}
+
+
+template <typename Element>
 EvalKey<Element> SchemeBase<Element>::MultiKeySwitchGen(const PrivateKey<Element> oldPrivateKey,
                                                         const PrivateKey<Element> newPrivateKey,
                                                         const EvalKey<Element> evalKey) const {

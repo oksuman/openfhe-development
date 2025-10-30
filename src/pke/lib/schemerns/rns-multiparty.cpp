@@ -44,6 +44,7 @@ namespace lbcrypto {
 
 Ciphertext<DCRTPoly> MultipartyRNS::MultipartyDecryptLead(ConstCiphertext<DCRTPoly> ciphertext,
                                                           const PrivateKey<DCRTPoly> privateKey) const {
+    std::cout << "in MultipartyDecryptLead" << std::endl;
     const auto cryptoParams = std::dynamic_pointer_cast<CryptoParametersRNS>(privateKey->GetCryptoParameters());
 
     const std::vector<DCRTPoly>& cv = ciphertext->GetElements();
@@ -110,6 +111,8 @@ Ciphertext<DCRTPoly> MultipartyRNS::MultipartyDecryptLead(ConstCiphertext<DCRTPo
 
 Ciphertext<DCRTPoly> MultipartyRNS::MultipartyDecryptMain(ConstCiphertext<DCRTPoly> ciphertext,
                                                           const PrivateKey<DCRTPoly> privateKey) const {
+
+    std::cout << "in MultipartyDecryptMain" << std::endl;
     const auto cryptoParams = std::dynamic_pointer_cast<CryptoParametersRNS>(privateKey->GetCryptoParameters());
     const auto ns           = cryptoParams->GetNoiseScale();
 
@@ -168,6 +171,143 @@ Ciphertext<DCRTPoly> MultipartyRNS::MultipartyDecryptMain(ConstCiphertext<DCRTPo
     result->SetElement(std::move(b));
     return result;
 }
+
+Ciphertext<DCRTPoly> MultipartyRNS::GenPartialDec(ConstCiphertext<DCRTPoly> ciphertext,
+                                                  const PrivateKey<DCRTPoly> privateKey,
+                                                  bool denomClear,
+                                                  const std::string& shareType,
+                                                  uint32_t N) const {
+    const auto cryptoParams = std::dynamic_pointer_cast<CryptoParametersRNS>(privateKey->GetCryptoParameters());
+    const std::vector<DCRTPoly>& cv = ciphertext->GetElements();
+    auto s(privateKey->GetPrivateElement());
+
+    size_t sizeQ  = s.GetParams()->GetParams().size();
+    size_t sizeQl = cv[0].GetParams()->GetParams().size();
+    size_t diffQl = sizeQ - sizeQl;
+    s.DropLastElements(diffQl);
+
+    DCRTPoly noise;
+    const auto ns = cryptoParams->GetNoiseScale();
+
+    if (cryptoParams->GetMultipartyMode() == NOISE_FLOODING_MULTIPARTY) {
+        if (sizeQl < 3)
+            OPENFHE_THROW("sizeQl must be >= 3 in NOISE_FLOODING_MULTIPARTY mode.");
+        DugType dug;
+        auto params = cv[0].GetParams();
+        ILDCRTParams<BigInteger> paramsCopy = *params;
+        paramsCopy.PopFirstParam();
+        auto paramsAllButFirst = std::make_shared<ILDCRTParams<BigInteger>>(paramsCopy);
+        DCRTPoly e(dug, paramsAllButFirst, Format::EVALUATION);
+
+        auto cyclOrder = params->GetCyclotomicOrder();
+        std::vector<NativeInteger> moduliFirst = {params->GetParams()[0]->GetModulus()};
+        std::vector<NativeInteger> rootsFirst  = {params->GetParams()[0]->GetRootOfUnity()};
+        auto paramsFirst = std::make_shared<ILDCRTParams<BigInteger>>(cyclOrder, moduliFirst, rootsFirst);
+        e.ExpandCRTBasisReverseOrder(params, paramsFirst,
+                                     cryptoParams->GetMultipartyQHatInvModqAtIndex(sizeQl - 2),
+                                     cryptoParams->GetMultipartyQHatInvModqPreconAtIndex(sizeQl - 2),
+                                     cryptoParams->GetMultipartyQHatModq0AtIndex(sizeQl - 2),
+                                     cryptoParams->GetMultipartyAlphaQModq0AtIndex(sizeQl - 2),
+                                     cryptoParams->GetMultipartyModq0BarrettMu(),
+                                     cryptoParams->GetMultipartyQInv(),
+                                     Format::EVALUATION);
+        noise = e;
+    }
+    else if (cryptoParams->GetDecryptionNoiseMode() == NOISE_FLOODING_DECRYPT &&
+             cryptoParams->GetExecutionMode() == EXEC_EVALUATION) {
+        auto dgg = cryptoParams->GetFloodingDiscreteGaussianGenerator();
+        DCRTPoly e(dgg, cv[0].GetParams(), Format::EVALUATION);
+        noise = std::move(e);
+    }
+    else {
+        DggType dgg(NoiseFlooding::MP_SD);
+        DCRTPoly e(dgg, cv[0].GetParams(), Format::EVALUATION);
+        noise = std::move(e);
+    }
+
+    auto params = cv[0].GetParams();
+    DCRTPoly b;
+
+    if (!denomClear) {
+        std::cout << "no denominator clearing" << std::endl;
+        // b = s * cv[1];
+        b = s * cv[1] + ns * noise;
+    } else {
+        if (shareType == "additive") {
+            b = s * cv[1] + ns * noise;
+        }
+        else if (shareType == "shamir") {
+            std::cout << "denominator clearing in shamir share (noise scaled by N!)" << std::endl;
+
+            // Precompute N! mod q_k once per tower using PARTY COUNT N (not ring dimension)
+            const auto vecSize = params->GetParams().size();
+            std::vector<NativeInteger> Nfact_mod(vecSize, NativeInteger(1));
+            for (size_t k = 0; k < vecSize; ++k) {
+                auto modq_k = params->GetParams()[k]->GetModulus();
+                NativeInteger acc(1);
+                for (usint t = 2; t <= N; ++t)
+                    acc = acc.ModMul(NativeInteger(t), modq_k);
+                Nfact_mod[k] = acc;
+            }
+
+            // Multiply each tower of noise by N! mod q_k
+            std::vector<NativePoly> noiseScaled;
+            noiseScaled.reserve(noise.GetNumOfElements());
+            for (usint k = 0; k < noise.GetNumOfElements(); ++k) {
+                auto nk = noise.GetElementAtIndex(k);
+                auto mk = params->GetParams()[k]->GetModulus();
+                for (usint j = 0; j < nk.GetLength(); ++j)
+                    nk[j] = nk[j].ModMul(Nfact_mod[k], mk);
+                noiseScaled.emplace_back(std::move(nk));
+            }
+            DCRTPoly noiseScaledDCRT(noiseScaled);
+
+            // Final partial: s*c1 + ns * (N! * noise)
+            b = s * cv[1] + ns * noiseScaledDCRT;
+        }
+        else if (shareType == "2adic") {
+            // Scale the noise by 2^L (L = number of participating shares)
+            std::cout << "denominator clearing in 2adic share (noise scaled by 2^L)" << std::endl;
+
+            const auto vecSize = params->GetParams().size();
+            std::vector<NativeInteger> TwoPowL_mod(vecSize, NativeInteger(1));
+
+            // Precompute 2^L mod q_k per tower
+            for (size_t k = 0; k < vecSize; ++k) {
+                auto modq_k = params->GetParams()[k]->GetModulus();
+                // safe modular exponentiation: (2^L) mod q_k
+                TwoPowL_mod[k] = NativeInteger(2).ModExp(NativeInteger(static_cast<uint64_t>(N)),
+                                                         modq_k);
+            }
+
+            // Multiply each tower of noise by 2^L mod q_k
+            std::vector<NativePoly> noiseScaled;
+            noiseScaled.reserve(noise.GetNumOfElements());
+            for (usint k = 0; k < noise.GetNumOfElements(); ++k) {
+                auto nk = noise.GetElementAtIndex(k);                 // EVALUATION domain
+                auto mk = params->GetParams()[k]->GetModulus();
+                const auto scale = TwoPowL_mod[k];
+                for (usint j = 0; j < nk.GetLength(); ++j)
+                    nk[j] = nk[j].ModMul(scale, mk);
+                noiseScaled.emplace_back(std::move(nk));
+            }
+            DCRTPoly noiseScaledDCRT(noiseScaled);
+
+            // Final partial: s*c1 + ns * (2^L * noise)
+            b = s * cv[1] + ns * noiseScaledDCRT;
+        }
+        else {
+            OPENFHE_THROW("Unknown shareType in GenPartialDec");
+        }
+    }
+
+    auto result = ciphertext->CloneEmpty();
+    result->SetElement(std::move(b));
+    return result;
+}
+
+
+
 
 EvalKey<DCRTPoly> MultipartyRNS::MultiMultEvalKey(PrivateKey<DCRTPoly> privateKey, EvalKey<DCRTPoly> evalKey) const {
     const auto cryptoParams =

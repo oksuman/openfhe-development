@@ -197,6 +197,11 @@ public:
     virtual Ciphertext<Element> MultipartyDecryptLead(ConstCiphertext<Element> ciphertext,
                                                       const PrivateKey<Element> privateKey) const;
 
+    virtual Ciphertext<Element> GenPartialDec(ConstCiphertext<Element> ciphertext,
+                                              const PrivateKey<Element> privateKey,
+                                              bool denomClear = false,
+                                              const std::string& shareType = "", uint32_t N=0) const;
+
     /**
    * Threshold FHE: Method for combining the partially decrypted ciphertexts
    * and getting the final decryption in the clear as a NativePoly.

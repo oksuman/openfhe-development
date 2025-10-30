@@ -86,6 +86,12 @@ public:
     Ciphertext<DCRTPoly> MultipartyDecryptLead(ConstCiphertext<DCRTPoly> ciphertext,
                                                const PrivateKey<DCRTPoly> privateKey) const override;
 
+
+    Ciphertext<DCRTPoly> GenPartialDec(ConstCiphertext<DCRTPoly> ciphertext,
+                                   const PrivateKey<DCRTPoly> privateKey,
+                                   bool denomClear = false,
+                                   const std::string& shareType = "", uint32_t N=0) const override;
+
     EvalKey<DCRTPoly> MultiMultEvalKey(PrivateKey<DCRTPoly> privateKey, EvalKey<DCRTPoly> evalKey) const override;
 
     Ciphertext<DCRTPoly> IntBootDecrypt(const PrivateKey<DCRTPoly> privateKey,
