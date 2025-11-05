@@ -677,10 +677,6 @@ DecryptResult CryptoContextImpl<DCRTPoly>::MultipartyDecryptFusionDistributed(
     bool denomClear,
     uint32_t N) const {
 
-    // ===== DEBUG BEGIN =====
-    std::cout << "in fusion decryption (shareType=" << shareType << "), denomClear=" << (denomClear ? "true" : "false")
-              << ", N=" << N << std::endl;
-    // ===== DEBUG END =====
     DecryptResult result;
 
     if (!ciphertext)
@@ -795,11 +791,12 @@ DecryptResult CryptoContextImpl<DCRTPoly>::MultipartyDecryptFusionDistributed(
                 auto params_k = elementParams->GetParams()[k];
                 auto modq_k   = params_k->GetModulus();
 
-                NativeInteger Nfact(1);
+                NativeInteger Nfact(1);                
                 if (denomClear) {
                     for (usint t = 2; t <= N; ++t)
                         Nfact = Nfact.ModMul(NativeInteger(t), modq_k);
                 }
+                Nfact = Nfact.ModMul(Nfact, modq_k);
 
                 NativeInteger numerator(1);
                 NativeInteger denominator(1);
@@ -823,17 +820,6 @@ DecryptResult CryptoContextImpl<DCRTPoly>::MultipartyDecryptFusionDistributed(
                 NativePoly poly(params_k, Format::COEFFICIENT, true);
                 poly[0] = Lj_scaled;
                 LjConst.SetElementAtIndex(k, std::move(poly));
-
-                // ===== DEBUG BEGIN =====
-                // std::cout << "[tower " << k << ", j=" << j << "] q_k=" << modq_k
-                //           << " N!=" << (denomClear ? "N!" : "1")
-                //           << " num=" << numerator
-                //           << " denom=" << denominator
-                //           << " denom^-1=" << denomInv
-                //           << " Lj=" << Lj_val
-                //           << " scaledLj=" << Lj_scaled
-                //           << std::endl;
-                // ===== DEBUG END =====
             }
 
             LjConst.SetFormat(Format::EVALUATION);
@@ -867,6 +853,8 @@ DecryptResult CryptoContextImpl<DCRTPoly>::MultipartyDecryptFusionDistributed(
                 NativeInteger Nfact_k(1);
                 for (usint t = 2; t <= N; ++t)
                     Nfact_k = Nfact_k.ModMul(NativeInteger(t), modq_k);
+                Nfact_k = Nfact_k.ModMul(Nfact_k, modq_k);
+
                 NativePoly poly(params_k, Format::COEFFICIENT, true);
                 poly[0] = Nfact_k;
                 NfactConst.SetElementAtIndex(k, std::move(poly));
@@ -917,7 +905,7 @@ DecryptResult CryptoContextImpl<DCRTPoly>::MultipartyDecryptFusionDistributed(
     // 2adic:
     // =========================
     if (shareType == "2adic") {
-        const uint64_t Lexp = static_cast<uint64_t>(L);
+        const uint64_t Lexp = static_cast<uint64_t>(L-1);
 
         std::vector<DCRTPoly> alphas;
         alphas.reserve(L);
@@ -990,7 +978,7 @@ DecryptResult CryptoContextImpl<DCRTPoly>::MultipartyDecryptFusionDistributed(
             // compute L_j
             DCRTPoly Lj = NumeratorEval * DenInvEval;
 
-            // compute clearing factor δ = 2^L (per tower)
+            // compute clearing factor δ = 2^{t-1} (per tower)
             DCRTPoly Delta(elementParams, Format::COEFFICIENT, true);
             for (size_t k = 0; k < vecSize; ++k) {
                 auto params_k = elementParams->GetParams()[k];
@@ -1004,18 +992,6 @@ DecryptResult CryptoContextImpl<DCRTPoly>::MultipartyDecryptFusionDistributed(
 
             DCRTPoly LjCleared = Lj * Delta;
             DCRTPoly DeltaDenInvEval = DenInvEval * Delta;
-
-
-            // // ===== DEBUG OUTPUT =====
-            // std::cout << "--------------------------------------------" << std::endl;
-            // std::cout << "[2adic j=" << j << "] Debug summary" << std::endl;
-            // PrintDCRTPoly(Delta, "Δ (2^L)");
-            // PrintDCRTPoly(DenominatorEval, "Denominator");
-            // PrintDCRTPoly(DenInvEval, "Denominator^{-1}");
-            // PrintDCRTPoly(DeltaDenInvEval, "Δ * Denominator^{-1}");
-            // PrintDCRTPoly(Lj, "L_j (uncleared)");
-            // PrintDCRTPoly(LjCleared, "Δ * L_j (cleared)");
-            // std::cout << "--------------------------------------------" << std::endl;
 
             if (denomClear)
                 Lj = std::move(LjCleared);
@@ -1094,7 +1070,6 @@ DecryptResult CryptoContextImpl<DCRTPoly>::MultipartyDecryptFusionDistributed(
         *plaintext = std::move(decrypted);
         return result;
     }
-
     OPENFHE_THROW("Unknown shareType in fusion");
 }
 

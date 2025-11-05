@@ -176,7 +176,7 @@ Ciphertext<DCRTPoly> MultipartyRNS::GenPartialDec(ConstCiphertext<DCRTPoly> ciph
                                                   const PrivateKey<DCRTPoly> privateKey,
                                                   bool denomClear,
                                                   const std::string& shareType,
-                                                  uint32_t N) const {
+                                                  uint32_t N, uint32_t t) const {
     const auto cryptoParams = std::dynamic_pointer_cast<CryptoParametersRNS>(privateKey->GetCryptoParameters());
     const std::vector<DCRTPoly>& cv = ciphertext->GetElements();
     auto s(privateKey->GetPrivateElement());
@@ -230,16 +230,13 @@ Ciphertext<DCRTPoly> MultipartyRNS::GenPartialDec(ConstCiphertext<DCRTPoly> ciph
 
     if (!denomClear) {
         std::cout << "no denominator clearing" << std::endl;
-        // b = s * cv[1];
         b = s * cv[1] + ns * noise;
     } else {
         if (shareType == "additive") {
             b = s * cv[1] + ns * noise;
         }
         else if (shareType == "shamir") {
-            // std::cout << "denominator clearing in shamir share (noise scaled by (N!)^2)" << std::endl;
-
-            // Precompute (N!)^4 mod q_k once per tower using PARTY COUNT N (not ring dimension)
+            // Precompute (N!)^2 mod q_k once per tower using PARTY COUNT N (not ring dimension)
             const auto vecSize = params->GetParams().size();
             std::vector<NativeInteger> Nfact_mod(vecSize, NativeInteger(1));
             for (size_t k = 0; k < vecSize; ++k) {
@@ -250,11 +247,12 @@ Ciphertext<DCRTPoly> MultipartyRNS::GenPartialDec(ConstCiphertext<DCRTPoly> ciph
                 for (usint t = 2; t <= N; ++t)
                     acc = acc.ModMul(NativeInteger(t), modq_k);
 
-                // Step 2: raise to 4th power -> (N!)^2 mod q_k
+                // Step 2: raise to (N!)^2 mod q_k
                 NativeInteger acc2 = acc;
                 acc2 = acc2.ModMul(acc, modq_k);  // (N!)^2
                 Nfact_mod[k] = acc2;
             }
+
             // Multiply each tower of noise by (N!)^2 mod q_k
             std::vector<NativePoly> noiseScaled;
             noiseScaled.reserve(noise.GetNumOfElements());
@@ -271,21 +269,19 @@ Ciphertext<DCRTPoly> MultipartyRNS::GenPartialDec(ConstCiphertext<DCRTPoly> ciph
             b = s * cv[1] + ns * noiseScaledDCRT;
         }
         else if (shareType == "2adic") {
-            // Scale the noise by 2^T (T = number of participating shares)
-            // std::cout << "denominator clearing in 2adic share (noise scaled by 2^T)" << std::endl;
+            // Scale the noise by 2^{t-1} (t = number of participating shares)
 
             const auto vecSize = params->GetParams().size();
             std::vector<NativeInteger> TwoPowL_mod(vecSize, NativeInteger(1));
 
-            // Precompute 2^L mod q_k per tower
+            // Precompute 2^{t-1} mod q_k per tower
             for (size_t k = 0; k < vecSize; ++k) {
                 auto modq_k = params->GetParams()[k]->GetModulus();
-                // safe modular exponentiation: (2^L) mod q_k
-                TwoPowL_mod[k] = NativeInteger(2).ModExp(NativeInteger(static_cast<uint64_t>(N)),
+                TwoPowL_mod[k] = NativeInteger(2).ModExp(NativeInteger(static_cast<uint64_t>(t-1)),
                                                          modq_k);
             }
 
-            // Multiply each tower of noise by 2^L mod q_k
+            // Multiply each tower of noise by 2^{t-1} mod q_k
             std::vector<NativePoly> noiseScaled;
             noiseScaled.reserve(noise.GetNumOfElements());
             for (usint k = 0; k < noise.GetNumOfElements(); ++k) {
@@ -298,7 +294,7 @@ Ciphertext<DCRTPoly> MultipartyRNS::GenPartialDec(ConstCiphertext<DCRTPoly> ciph
             }
             DCRTPoly noiseScaledDCRT(noiseScaled);
 
-            // Final partial: s*c1 + ns * (2^L * noise)
+            // Final partial: s*c1 + ns * (2^{t-1} * noise)
             b = s * cv[1] + ns * noiseScaledDCRT;
         }
         else {
@@ -310,9 +306,6 @@ Ciphertext<DCRTPoly> MultipartyRNS::GenPartialDec(ConstCiphertext<DCRTPoly> ciph
     result->SetElement(std::move(b));
     return result;
 }
-
-
-
 
 EvalKey<DCRTPoly> MultipartyRNS::MultiMultEvalKey(PrivateKey<DCRTPoly> privateKey, EvalKey<DCRTPoly> evalKey) const {
     const auto cryptoParams =

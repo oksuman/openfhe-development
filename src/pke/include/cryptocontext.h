@@ -3219,10 +3219,10 @@ public:
     Ciphertext<Element> GenPartialDec(ConstCiphertext<Element>& ciphertext,
                                   const PrivateKey<Element> privateKey,
                                   bool denomClear = false,
-                                  const std::string& shareType = "", uint32_t N=0) const {
+                                  const std::string& shareType = "", uint32_t N=0, uint32_t t=0) const {
         ValidateKey(privateKey);
         ValidateCiphertext(ciphertext);
-        return GetScheme()->GenPartialDec(ciphertext, privateKey, denomClear, shareType, N);
+        return GetScheme()->GenPartialDec(ciphertext, privateKey, denomClear, shareType, N, t);
     }
 
     /**

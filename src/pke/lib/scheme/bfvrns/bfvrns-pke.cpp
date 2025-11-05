@@ -106,7 +106,7 @@ static std::vector<NativeInteger> MakeScalePerTower_2PowT(
     std::vector<NativeInteger> v(vecSize);
     for (size_t k = 0; k < vecSize; ++k) {
         auto qk = params->GetParams()[k]->GetModulus();
-        v[k]    = NativeInteger(2).ModExp(NativeInteger(T), qk); // 2^T mod qk
+        v[k]    = NativeInteger(2).ModExp(NativeInteger(T), qk); // 2^{t-1} mod qk, T=t-1
     }
     return v;
 }
@@ -188,7 +188,7 @@ KeyPair<DCRTPoly> PKEBFVRNS::KeyGenInternalSpecial(CryptoContext<DCRTPoly> cc,
 
     DCRTPoly eScaled;
     if (shareType == "2adic") {
-        auto scale2Pow = MakeScalePerTower_2PowT(paramsPK, static_cast<uint64_t>(Threshold));
+        auto scale2Pow = MakeScalePerTower_2PowT(paramsPK, static_cast<uint64_t>(Threshold-1));
         eScaled = ScaleNoisePerTower(e, paramsPK, scale2Pow);
     }
     else if (shareType == "shamir") {
@@ -214,9 +214,6 @@ KeyPair<DCRTPoly> PKEBFVRNS::KeyGenInternalSpecial(CryptoContext<DCRTPoly> cc,
     keyPair.secretKey->SetPrivateElement(std::move(s));
     keyPair.publicKey->SetPublicElements(std::vector<DCRTPoly>{std::move(b), std::move(a)});
     keyPair.publicKey->SetKeyTag(keyPair.secretKey->GetKeyTag());
-
-    std::cout << "[SpecialKeyGen] shareType=" << shareType
-              << ", N=" << N << ", T=" << Threshold << std::endl;
 
     return keyPair;
 }

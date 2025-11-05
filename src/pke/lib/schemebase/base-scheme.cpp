@@ -202,10 +202,10 @@ Ciphertext<Element> SchemeBase<Element>::GenPartialDec(
     ConstCiphertext<Element>& ciphertext,
     const PrivateKey<Element> privateKey,
     bool denomClear,
-    const std::string& shareType, uint32_t N) const {
+    const std::string& shareType, uint32_t N, uint32_t t) const {
     VerifyMultipartyEnabled(__func__);
     CheckMultipartyDecryptCompatibility(ciphertext);
-    auto result = m_Multiparty->GenPartialDec(ciphertext, privateKey, denomClear, shareType, N);
+    auto result = m_Multiparty->GenPartialDec(ciphertext, privateKey, denomClear, shareType, N, t);
     result->SetKeyTag(privateKey->GetKeyTag());
     return result;
 }

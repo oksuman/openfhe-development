@@ -1043,7 +1043,7 @@ public:
     virtual Ciphertext<Element> GenPartialDec(ConstCiphertext<Element>& ciphertext,
                                           const PrivateKey<Element> privateKey,
                                           bool denomClear = false,
-                                          const std::string& shareType = "", uint32_t N=0) const;
+                                          const std::string& shareType = "", uint32_t N=0, uint32_t t=0) const;
 
     virtual DecryptResult MultipartyDecryptFusion(const std::vector<Ciphertext<Element>>& ciphertextVec,
                                                   NativePoly* plaintext) const {
