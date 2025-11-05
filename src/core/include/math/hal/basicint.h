@@ -45,7 +45,7 @@
     using int128_t        = __int128;
 #elif NATIVEINT == 64
     #if defined(HAVE_INT128)
-        #define MAX_MODULUS_SIZE 60
+        #define MAX_MODULUS_SIZE 60 // can be change?
         using BasicInteger    = uint64_t;
         using DoubleNativeInt = unsigned __int128;
         using uint128_t       = unsigned __int128;

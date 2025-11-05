@@ -202,6 +202,13 @@ public:
         return m_PKE->KeyGenInternal(cc, makeSparse);
     }
 
+    virtual KeyPair<Element> SpecialKeyGen(CryptoContext<Element> cc,
+                                       const std::string& shareType,
+                                       usint N, usint Threshold) const {
+        VerifyPKEEnabled(__func__);
+        return m_PKE->KeyGenInternalSpecial(cc, shareType, N, Threshold);
+    }
+    
     virtual Ciphertext<Element> Encrypt(const Element& plaintext, const PrivateKey<Element> privateKey) const {
         VerifyPKEEnabled(__func__);
         return m_PKE->Encrypt(plaintext, privateKey);

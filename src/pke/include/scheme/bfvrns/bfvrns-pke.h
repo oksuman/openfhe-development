@@ -53,6 +53,9 @@ public:
     virtual ~PKEBFVRNS() {}
 
     KeyPair<DCRTPoly> KeyGenInternal(CryptoContext<DCRTPoly> cc, bool makeSparse) const override;
+    KeyPair<DCRTPoly> KeyGenInternalSpecial(CryptoContext<DCRTPoly> cc,
+                                            const std::string& shareType,
+                                            usint N, usint Threshold) const override;
 
     /**
    * Method for encrypting plaintext using LBC

@@ -237,20 +237,25 @@ Ciphertext<DCRTPoly> MultipartyRNS::GenPartialDec(ConstCiphertext<DCRTPoly> ciph
             b = s * cv[1] + ns * noise;
         }
         else if (shareType == "shamir") {
-            std::cout << "denominator clearing in shamir share (noise scaled by N!)" << std::endl;
+            // std::cout << "denominator clearing in shamir share (noise scaled by (N!)^2)" << std::endl;
 
-            // Precompute N! mod q_k once per tower using PARTY COUNT N (not ring dimension)
+            // Precompute (N!)^4 mod q_k once per tower using PARTY COUNT N (not ring dimension)
             const auto vecSize = params->GetParams().size();
             std::vector<NativeInteger> Nfact_mod(vecSize, NativeInteger(1));
             for (size_t k = 0; k < vecSize; ++k) {
                 auto modq_k = params->GetParams()[k]->GetModulus();
                 NativeInteger acc(1);
+
+                // Step 1: compute N! mod q_k
                 for (usint t = 2; t <= N; ++t)
                     acc = acc.ModMul(NativeInteger(t), modq_k);
-                Nfact_mod[k] = acc;
-            }
 
-            // Multiply each tower of noise by N! mod q_k
+                // Step 2: raise to 4th power -> (N!)^2 mod q_k
+                NativeInteger acc2 = acc;
+                acc2 = acc2.ModMul(acc, modq_k);  // (N!)^2
+                Nfact_mod[k] = acc2;
+            }
+            // Multiply each tower of noise by (N!)^2 mod q_k
             std::vector<NativePoly> noiseScaled;
             noiseScaled.reserve(noise.GetNumOfElements());
             for (usint k = 0; k < noise.GetNumOfElements(); ++k) {
@@ -262,12 +267,12 @@ Ciphertext<DCRTPoly> MultipartyRNS::GenPartialDec(ConstCiphertext<DCRTPoly> ciph
             }
             DCRTPoly noiseScaledDCRT(noiseScaled);
 
-            // Final partial: s*c1 + ns * (N! * noise)
+            // Final partial: s*c1 + ns * ((N!)^2 * noise)
             b = s * cv[1] + ns * noiseScaledDCRT;
         }
         else if (shareType == "2adic") {
-            // Scale the noise by 2^L (L = number of participating shares)
-            std::cout << "denominator clearing in 2adic share (noise scaled by 2^L)" << std::endl;
+            // Scale the noise by 2^T (T = number of participating shares)
+            // std::cout << "denominator clearing in 2adic share (noise scaled by 2^T)" << std::endl;
 
             const auto vecSize = params->GetParams().size();
             std::vector<NativeInteger> TwoPowL_mod(vecSize, NativeInteger(1));

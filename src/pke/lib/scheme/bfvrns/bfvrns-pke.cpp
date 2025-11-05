@@ -57,6 +57,7 @@ KeyPair<DCRTPoly> PKEBFVRNS::KeyGenInternal(CryptoContext<DCRTPoly> cc, bool mak
 
     const auto ns      = cryptoParams->GetNoiseScale();
     const DggType& dgg = cryptoParams->GetDiscreteGaussianGenerator();
+
     DugType dug;
     TugType tug;
 
@@ -95,6 +96,134 @@ KeyPair<DCRTPoly> PKEBFVRNS::KeyGenInternal(CryptoContext<DCRTPoly> cc, bool mak
 
     return keyPair;
 }
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+static std::vector<NativeInteger> MakeScalePerTower_2PowT(
+    const std::shared_ptr<ILDCRTParams<BigInteger>>& params, uint64_t T) {
+    const size_t vecSize = params->GetParams().size();
+    std::vector<NativeInteger> v(vecSize);
+    for (size_t k = 0; k < vecSize; ++k) {
+        auto qk = params->GetParams()[k]->GetModulus();
+        v[k]    = NativeInteger(2).ModExp(NativeInteger(T), qk); // 2^T mod qk
+    }
+    return v;
+}
+
+static std::vector<NativeInteger> MakeScalePerTower_FactPow4(
+    const std::shared_ptr<ILDCRTParams<BigInteger>>& params, uint32_t N) {
+    const size_t vecSize = params->GetParams().size();
+    std::vector<NativeInteger> v(vecSize, NativeInteger(1));
+    for (size_t k = 0; k < vecSize; ++k) {
+        auto qk  = params->GetParams()[k]->GetModulus();
+        NativeInteger acc(1);
+        // acc = N! mod qk
+        for (uint32_t t = 2; t <= N; ++t)
+            acc = acc.ModMul(NativeInteger(t), qk);
+        // acc4 = (N!)^4 mod qk
+        NativeInteger acc4 = acc;
+        acc4 = acc4.ModMul(acc, qk); // (N!)^2
+        acc4 = acc4.ModMul(acc, qk); // (N!)^3
+        acc4 = acc4.ModMul(acc, qk); // (N!)^4
+        v[k] = acc4;
+    }
+    return v;
+}
+
+static DCRTPoly ScaleNoisePerTower(const DCRTPoly& noise,
+                                   const std::shared_ptr<ILDCRTParams<BigInteger>>& params,
+                                   const std::vector<NativeInteger>& scalePerTower) {
+    std::vector<NativePoly> scaled;
+    scaled.reserve(noise.GetNumOfElements());
+    for (usint k = 0; k < noise.GetNumOfElements(); ++k) {
+        auto nk = noise.GetElementAtIndex(k);         // EVALUATION
+        auto qk = params->GetParams()[k]->GetModulus();
+        const auto s = scalePerTower[k];
+        for (usint j = 0; j < nk.GetLength(); ++j)
+            nk[j] = nk[j].ModMul(s, qk);
+        scaled.emplace_back(std::move(nk));
+    }
+    return DCRTPoly(scaled);
+}
+
+KeyPair<DCRTPoly> PKEBFVRNS::KeyGenInternalSpecial(CryptoContext<DCRTPoly> cc,
+                                                   const std::string& shareType,
+                                                   usint N, usint Threshold) const {
+    KeyPair<DCRTPoly> keyPair(std::make_shared<PublicKeyImpl<DCRTPoly>>(cc),
+                              std::make_shared<PrivateKeyImpl<DCRTPoly>>(cc));
+
+    const auto cryptoParams = std::dynamic_pointer_cast<CryptoParametersBFVRNS>(cc->GetCryptoParameters());
+
+    std::shared_ptr<ParmType> elementParams = cryptoParams->GetElementParams();
+    if (cryptoParams->GetEncryptionTechnique() == EXTENDED) {
+        elementParams = cryptoParams->GetParamsQr();
+    }
+    const std::shared_ptr<ParmType> paramsPK = cryptoParams->GetParamsPK();
+
+    const auto ns      = cryptoParams->GetNoiseScale();               // default 1
+    const DggType& dgg = cryptoParams->GetDiscreteGaussianGenerator();
+
+    DugType dug;
+    TugType tug;
+
+    // ===== Secret key s =====
+    DCRTPoly s;
+    switch (cryptoParams->GetSecretKeyDist()) {
+        case GAUSSIAN:
+            s = DCRTPoly(dgg, paramsPK, Format::EVALUATION);
+            break;
+        case UNIFORM_TERNARY:
+            s = DCRTPoly(tug, paramsPK, Format::EVALUATION);
+            break;
+        case SPARSE_TERNARY:
+            s = DCRTPoly(tug, paramsPK, Format::EVALUATION, 192);
+            break;
+        default:
+            break;
+    }
+
+    DCRTPoly a(dug, paramsPK, Format::EVALUATION);
+    DCRTPoly e(dgg, paramsPK, Format::EVALUATION);
+
+    DCRTPoly eScaled;
+    if (shareType == "2adic") {
+        auto scale2Pow = MakeScalePerTower_2PowT(paramsPK, static_cast<uint64_t>(Threshold));
+        eScaled = ScaleNoisePerTower(e, paramsPK, scale2Pow);
+    }
+    else if (shareType == "shamir") {
+        auto scaleFact4 = MakeScalePerTower_FactPow4(paramsPK, static_cast<uint32_t>(N));
+        eScaled = ScaleNoisePerTower(e, paramsPK, scaleFact4);
+    }
+    else if (shareType == "additive" ) {
+        eScaled = e;
+    }
+    else {
+        OPENFHE_THROW("SpecialKeyGen: unknown shareType = " + shareType);
+    }
+
+    // b = ns * eScaled - a * s
+    DCRTPoly b(ns * eScaled - a * s);
+
+    usint sizeQ  = elementParams->GetParams().size();
+    usint sizePK = paramsPK->GetParams().size();
+    if (sizePK > sizeQ) {
+        s.DropLastElements(sizePK - sizeQ);
+    }
+
+    keyPair.secretKey->SetPrivateElement(std::move(s));
+    keyPair.publicKey->SetPublicElements(std::vector<DCRTPoly>{std::move(b), std::move(a)});
+    keyPair.publicKey->SetKeyTag(keyPair.secretKey->GetKeyTag());
+
+    std::cout << "[SpecialKeyGen] shareType=" << shareType
+              << ", N=" << N << ", T=" << Threshold << std::endl;
+
+    return keyPair;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 
 Ciphertext<DCRTPoly> PKEBFVRNS::Encrypt(DCRTPoly ptxt, const PrivateKey<DCRTPoly> privateKey) const {
     Ciphertext<DCRTPoly> ciphertext(std::make_shared<CiphertextImpl<DCRTPoly>>(privateKey));

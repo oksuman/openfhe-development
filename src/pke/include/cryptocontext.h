@@ -1241,6 +1241,10 @@ public:
         return GetScheme()->KeyGen(GetContextForPointer(this), false);
     }
 
+    KeyPair<Element> SpecialKeyGen(const std::string& shareType, usint N, usint Threshold) const {
+        return GetScheme()->SpecialKeyGen(GetContextForPointer(this), shareType, N, Threshold);
+    }
+
     /**
     * @brief Generates a sparse key pair (with special structure and without full entropy) for special use cases like ring reduction.
     *

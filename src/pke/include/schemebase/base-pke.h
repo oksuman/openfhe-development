@@ -72,6 +72,12 @@ public:
    * @return function ran correctly.
    */
     virtual KeyPair<Element> KeyGenInternal(CryptoContext<Element> cc, bool makeSparse) const;
+    virtual KeyPair<Element> KeyGenInternalSpecial(
+        CryptoContext<Element> cc,
+        const std::string& shareType,
+        usint N, usint Threshold) const {
+        OPENFHE_THROW("KeyGenInternalSpecial() not implemented for this scheme.");
+    }
 
     //  virtual KeyPair<Element> KeyGen(CryptoContext<Element> cc,
     //                                    bool makeSparse,
