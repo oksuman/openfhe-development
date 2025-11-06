@@ -172,6 +172,60 @@ Ciphertext<DCRTPoly> MultipartyRNS::MultipartyDecryptMain(ConstCiphertext<DCRTPo
     return result;
 }
 
+// static void PrintDCRTPoly(const DCRTPoly& poly, const std::string& name) {
+//     DCRTPoly temp = poly;
+//     if (temp.GetFormat() == Format::EVALUATION)
+//         temp.SwitchFormat();  // NTT domain → coefficient domain
+
+//     std::cout << "==== " << name << " ====" << std::endl;
+//     auto towers = temp.GetAllElements();
+
+//     for (size_t i = 0; i < towers.size(); i++) {
+//         std::cout << "  Tower " << i 
+//                   << " (modulus = " << towers[i].GetModulus() << ")" << std::endl;
+
+//         auto vals = towers[i].GetValues();  
+//         size_t len = vals.GetLength();   
+
+//         // Find maximum coefficient in balanced representation [-q/2, q/2)
+//         auto modulus = towers[i].GetModulus();
+//         uint64_t q = modulus.ConvertToInt<uint64_t>();
+//         uint64_t q_half = q / 2;
+        
+//         int64_t maxAbsCoeff = 0;
+//         for (size_t j = 0; j < len; j++) {
+//             uint64_t val = vals[j].ConvertToInt<uint64_t>();
+//             int64_t balanced;
+            
+//             if (val > q_half) {
+//                 balanced = static_cast<int64_t>(val) - static_cast<int64_t>(q);
+//             } else {
+//                 balanced = static_cast<int64_t>(val);
+//             }
+            
+//             int64_t absVal = std::abs(balanced);
+//             if (absVal > maxAbsCoeff)
+//                 maxAbsCoeff = absVal;
+//         }
+        
+//         // Calculate bit length of maximum absolute value
+//         int bitLength = 0;
+//         if (maxAbsCoeff > 0) {
+//             bitLength = 64 - __builtin_clzll(static_cast<uint64_t>(maxAbsCoeff));
+//         }
+        
+//         std::cout << "    Max |coefficient| (balanced): " << maxAbsCoeff 
+//                   << " (" << bitLength << " bits)" << std::endl;
+
+//         for (size_t j = 0; j < std::min<size_t>(len, 32); j++)
+//             std::cout << vals[j] << " ";
+//         if (len > 32)
+//             std::cout << "...";
+//         std::cout << std::endl;
+//     }
+//     std::cout << std::endl;
+// }
+
 Ciphertext<DCRTPoly> MultipartyRNS::GenPartialDec(ConstCiphertext<DCRTPoly> ciphertext,
                                                   const PrivateKey<DCRTPoly> privateKey,
                                                   bool denomClear,
@@ -220,10 +274,15 @@ Ciphertext<DCRTPoly> MultipartyRNS::GenPartialDec(ConstCiphertext<DCRTPoly> ciph
         noise = std::move(e);
     }
     else {
-        DggType dgg(NoiseFlooding::MP_SD);
+        DggType dgg(NoiseFlooding::MP_SD_NEW);
+        // DggType dgg(NoiseFlooding::MP_SD);
         DCRTPoly e(dgg, cv[0].GetParams(), Format::EVALUATION);
         noise = std::move(e);
     }
+
+    // noise.SetFormat(Format::COEFFICIENT);
+    // PrintDCRTPoly(noise, "smudging noise");
+    // noise.SetFormat(Format::EVALUATION);
 
     auto params = cv[0].GetParams();
     DCRTPoly b;
@@ -293,6 +352,7 @@ Ciphertext<DCRTPoly> MultipartyRNS::GenPartialDec(ConstCiphertext<DCRTPoly> ciph
                 noiseScaled.emplace_back(std::move(nk));
             }
             DCRTPoly noiseScaledDCRT(noiseScaled);
+            // PrintDCRTPoly(noiseScaledDCRT, "scaled error in partial decryption");
 
             // Final partial: s*c1 + ns * (2^{t-1} * noise)
             b = s * cv[1] + ns * noiseScaledDCRT;
@@ -304,6 +364,10 @@ Ciphertext<DCRTPoly> MultipartyRNS::GenPartialDec(ConstCiphertext<DCRTPoly> ciph
 
     auto result = ciphertext->CloneEmpty();
     result->SetElement(std::move(b));
+
+    // b.SetFormat(Format::COEFFICIENT);
+    // PrintDCRTPoly(b, "partial decryption");
+    // b.SetFormat(Format::EVALUATION);
     return result;
 }
 

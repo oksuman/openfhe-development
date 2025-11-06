@@ -131,6 +131,7 @@ enum {
 enum NoiseFlooding {
     // noise flooding distribution parameter for distributed decryption in threshold FHE
     MP_SD = 1048576,
+    MP_SD_NEW = 137438953472, // 2^37
     // noise flooding distribution parameter for fixed 20 bits noise multihop PRE
     PRE_SD = 1048576,
     // number of additional moduli in NOISE_FLOODING_MULTIPARTY mode

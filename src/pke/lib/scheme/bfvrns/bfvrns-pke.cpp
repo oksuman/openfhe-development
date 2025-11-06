@@ -146,6 +146,59 @@ static DCRTPoly ScaleNoisePerTower(const DCRTPoly& noise,
     }
     return DCRTPoly(scaled);
 }
+// static void PrintDCRTPoly(const DCRTPoly& poly, const std::string& name) {
+//     DCRTPoly temp = poly;
+//     if (temp.GetFormat() == Format::EVALUATION)
+//         temp.SwitchFormat();  // NTT domain → coefficient domain
+
+//     std::cout << "==== " << name << " ====" << std::endl;
+//     auto towers = temp.GetAllElements();
+
+//     for (size_t i = 0; i < towers.size(); i++) {
+//         std::cout << "  Tower " << i 
+//                   << " (modulus = " << towers[i].GetModulus() << ")" << std::endl;
+
+//         auto vals = towers[i].GetValues();  
+//         size_t len = vals.GetLength();   
+
+//         // Find maximum coefficient in balanced representation [-q/2, q/2)
+//         auto modulus = towers[i].GetModulus();
+//         uint64_t q = modulus.ConvertToInt<uint64_t>();
+//         uint64_t q_half = q / 2;
+        
+//         int64_t maxAbsCoeff = 0;
+//         for (size_t j = 0; j < len; j++) {
+//             uint64_t val = vals[j].ConvertToInt<uint64_t>();
+//             int64_t balanced;
+            
+//             if (val > q_half) {
+//                 balanced = static_cast<int64_t>(val) - static_cast<int64_t>(q);
+//             } else {
+//                 balanced = static_cast<int64_t>(val);
+//             }
+            
+//             int64_t absVal = std::abs(balanced);
+//             if (absVal > maxAbsCoeff)
+//                 maxAbsCoeff = absVal;
+//         }
+        
+//         // Calculate bit length of maximum absolute value
+//         int bitLength = 0;
+//         if (maxAbsCoeff > 0) {
+//             bitLength = 64 - __builtin_clzll(static_cast<uint64_t>(maxAbsCoeff));
+//         }
+        
+//         std::cout << "    Max |coefficient| (balanced): " << maxAbsCoeff 
+//                   << " (" << bitLength << " bits)" << std::endl;
+
+//         for (size_t j = 0; j < std::min<size_t>(len, 32); j++)
+//             std::cout << vals[j] << " ";
+//         if (len > 32)
+//             std::cout << "...";
+//         std::cout << std::endl;
+//     }
+//     std::cout << std::endl;
+// }
 
 KeyPair<DCRTPoly> PKEBFVRNS::KeyGenInternalSpecial(CryptoContext<DCRTPoly> cc,
                                                    const std::string& shareType,
@@ -184,12 +237,18 @@ KeyPair<DCRTPoly> PKEBFVRNS::KeyGenInternalSpecial(CryptoContext<DCRTPoly> cc,
     }
 
     DCRTPoly a(dug, paramsPK, Format::EVALUATION);
+    // DCRTPoly a(paramsPK, Format::EVALUATION, true);
     DCRTPoly e(dgg, paramsPK, Format::EVALUATION);
+
+    // e.SetFormat(Format::COEFFICIENT);
+    // PrintDCRTPoly(e, "error in key generation");
+    // e.SetFormat(Format::EVALUATION);
 
     DCRTPoly eScaled;
     if (shareType == "2adic") {
         auto scale2Pow = MakeScalePerTower_2PowT(paramsPK, static_cast<uint64_t>(Threshold-1));
         eScaled = ScaleNoisePerTower(e, paramsPK, scale2Pow);
+        // PrintDCRTPoly(eScaled, "scaled error in key generation");
     }
     else if (shareType == "shamir") {
         auto scaleFact4 = MakeScalePerTower_FactPow4(paramsPK, static_cast<uint32_t>(N));
@@ -204,6 +263,12 @@ KeyPair<DCRTPoly> PKEBFVRNS::KeyGenInternalSpecial(CryptoContext<DCRTPoly> cc,
 
     // b = ns * eScaled - a * s
     DCRTPoly b(ns * eScaled - a * s);
+    // a.SetFormat(Format::COEFFICIENT);
+    // PrintDCRTPoly(a, "public key a in key generation");
+    // a.SetFormat(Format::EVALUATION);
+    // b.SetFormat(Format::COEFFICIENT);
+    // PrintDCRTPoly(b, "public key b in key generation");
+    // b.SetFormat(Format::EVALUATION);
 
     usint sizeQ  = elementParams->GetParams().size();
     usint sizePK = paramsPK->GetParams().size();
