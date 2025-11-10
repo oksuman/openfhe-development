@@ -200,6 +200,8 @@ static DCRTPoly ScaleNoisePerTower(const DCRTPoly& noise,
 //     std::cout << std::endl;
 // }
 
+
+
 KeyPair<DCRTPoly> PKEBFVRNS::KeyGenInternalSpecial(CryptoContext<DCRTPoly> cc,
                                                    const std::string& shareType,
                                                    usint N, usint Threshold) const {
@@ -257,6 +259,51 @@ KeyPair<DCRTPoly> PKEBFVRNS::KeyGenInternalSpecial(CryptoContext<DCRTPoly> cc,
     else if (shareType == "additive" ) {
         eScaled = e;
     }
+    else if (shareType == "BFM+25") {
+        // ------------------------------------------------------------
+        // Build Δ inline (no external helper)
+        // Δ = 2 * ∏_{e=1}^{⌊N/2⌋}(X^{2e}-1) * ∏_{e=1}^{⌊N/6⌋}(X^{2e}-1)
+        // ------------------------------------------------------------
+        const size_t vecSize = paramsPK->GetParams().size();
+        const usint  Ndim    = paramsPK->GetRingDimension();
+
+        DCRTPoly Delta(paramsPK, Format::COEFFICIENT, true);
+        // Initialize with constant 2
+        for (size_t k = 0; k < vecSize; ++k) {
+            auto pk     = paramsPK->GetParams()[k];
+            auto modq_k = pk->GetModulus();
+            NativePoly two(pk, Format::COEFFICIENT, true);
+            two[0] = NativeInteger(2) % modq_k;
+            Delta.SetElementAtIndex(k, std::move(two));
+        }
+        Delta.SetFormat(Format::EVALUATION);
+
+        auto mul_term = [&](usint deg) {
+            DCRTPoly term(paramsPK, Format::COEFFICIENT, true);
+            for (size_t k = 0; k < vecSize; ++k) {
+                auto pk     = paramsPK->GetParams()[k];
+                auto modq_k = pk->GetModulus();
+
+                NativePoly poly(pk, Format::COEFFICIENT, true);
+                poly[deg % Ndim] = NativeInteger(1);           // +X^{deg}
+                poly[0]          = modq_k - NativeInteger(1);  // -1
+                term.SetElementAtIndex(k, std::move(poly));
+            }
+            term.SetFormat(Format::EVALUATION);
+            Delta *= term;
+        };
+
+        const usint eMax1 = static_cast<usint>(N / 2);
+        for (usint e = 1; e <= eMax1; ++e)
+            mul_term(2 * e);
+        const usint eMax2 = static_cast<usint>(N / 6);
+        for (usint e = 1; e <= eMax2; ++e)
+            mul_term(2 * e);
+
+        // Multiply the keygen error by Δ
+        eScaled = e * Delta;
+    }
+
     else {
         OPENFHE_THROW("SpecialKeyGen: unknown shareType = " + shareType);
     }

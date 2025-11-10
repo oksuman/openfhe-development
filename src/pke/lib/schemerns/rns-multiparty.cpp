@@ -357,6 +357,45 @@ Ciphertext<DCRTPoly> MultipartyRNS::GenPartialDec(ConstCiphertext<DCRTPoly> ciph
             // Final partial: s*c1 + ns * (2^{t-1} * noise)
             b = s * cv[1] + ns * noiseScaledDCRT;
         }
+        else if (shareType == "BFM+25") {
+            const auto vecSize = params->GetParams().size();
+            const usint Ndim   = params->GetRingDimension();
+
+            DCRTPoly Delta(params, Format::COEFFICIENT, true);
+            for (size_t k = 0; k < vecSize; ++k) {
+                auto pk     = params->GetParams()[k];
+                auto modq_k = pk->GetModulus();
+                NativePoly two(pk, Format::COEFFICIENT, true);
+                two[0] = NativeInteger(2) % modq_k;
+                Delta.SetElementAtIndex(k, std::move(two));
+            }
+            Delta.SetFormat(Format::EVALUATION);
+
+            auto mul_term = [&](usint deg) {
+                DCRTPoly term(params, Format::COEFFICIENT, true);
+                for (size_t k = 0; k < vecSize; ++k) {
+                    auto pk     = params->GetParams()[k];
+                    auto modq_k = pk->GetModulus();
+                    NativePoly poly(pk, Format::COEFFICIENT, true);
+                    poly[deg % Ndim] = NativeInteger(1);
+                    poly[0] = modq_k - NativeInteger(1);
+                    term.SetElementAtIndex(k, std::move(poly));
+                }
+                term.SetFormat(Format::EVALUATION);
+                Delta *= term;
+            };
+
+            const usint eMax1 = static_cast<usint>(N / 2);
+            for (usint e = 1; e <= eMax1; ++e)
+                mul_term(2 * e);
+            const usint eMax2 = static_cast<usint>(N / 6);
+            for (usint e = 1; e <= eMax2; ++e)
+                mul_term(2 * e);
+
+            // Multiply noise by Δ
+            DCRTPoly noiseScaled = noise * Delta;
+            b = s * cv[1] + ns * noiseScaled;
+        }
         else {
             OPENFHE_THROW("Unknown shareType in GenPartialDec");
         }
