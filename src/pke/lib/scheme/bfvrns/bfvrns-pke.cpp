@@ -148,61 +148,59 @@ static DCRTPoly ScaleNoisePerTower(const DCRTPoly& noise,
     }
     return DCRTPoly(scaled);
 }
-// static void PrintDCRTPoly(const DCRTPoly& poly, const std::string& name) {
-//     DCRTPoly temp = poly;
-//     if (temp.GetFormat() == Format::EVALUATION)
-//         temp.SwitchFormat();  // NTT domain → coefficient domain
+static void PrintDCRTPoly(const DCRTPoly& poly, const std::string& name) {
+    DCRTPoly temp = poly;
+    if (temp.GetFormat() == Format::EVALUATION)
+        temp.SwitchFormat();  // NTT domain → coefficient domain
 
-//     std::cout << "==== " << name << " ====" << std::endl;
-//     auto towers = temp.GetAllElements();
+    std::cout << "==== " << name << " ====" << std::endl;
+    auto towers = temp.GetAllElements();
 
-//     for (size_t i = 0; i < towers.size(); i++) {
-//         std::cout << "  Tower " << i 
-//                   << " (modulus = " << towers[i].GetModulus() << ")" << std::endl;
+    for (size_t i = 0; i < towers.size(); i++) {
+        std::cout << "  Tower " << i 
+                  << " (modulus = " << towers[i].GetModulus() << ")" << std::endl;
 
-//         auto vals = towers[i].GetValues();  
-//         size_t len = vals.GetLength();   
+        auto vals = towers[i].GetValues();  
+        size_t len = vals.GetLength();   
 
-//         // Find maximum coefficient in balanced representation [-q/2, q/2)
-//         auto modulus = towers[i].GetModulus();
-//         uint64_t q = modulus.ConvertToInt<uint64_t>();
-//         uint64_t q_half = q / 2;
+        // Find maximum coefficient in balanced representation [-q/2, q/2)
+        auto modulus = towers[i].GetModulus();
+        uint64_t q = modulus.ConvertToInt<uint64_t>();
+        uint64_t q_half = q / 2;
         
-//         int64_t maxAbsCoeff = 0;
-//         for (size_t j = 0; j < len; j++) {
-//             uint64_t val = vals[j].ConvertToInt<uint64_t>();
-//             int64_t balanced;
+        int64_t maxAbsCoeff = 0;
+        for (size_t j = 0; j < len; j++) {
+            uint64_t val = vals[j].ConvertToInt<uint64_t>();
+            int64_t balanced;
             
-//             if (val > q_half) {
-//                 balanced = static_cast<int64_t>(val) - static_cast<int64_t>(q);
-//             } else {
-//                 balanced = static_cast<int64_t>(val);
-//             }
+            if (val > q_half) {
+                balanced = static_cast<int64_t>(val) - static_cast<int64_t>(q);
+            } else {
+                balanced = static_cast<int64_t>(val);
+            }
             
-//             int64_t absVal = std::abs(balanced);
-//             if (absVal > maxAbsCoeff)
-//                 maxAbsCoeff = absVal;
-//         }
+            int64_t absVal = std::abs(balanced);
+            if (absVal > maxAbsCoeff)
+                maxAbsCoeff = absVal;
+        }
         
-//         // Calculate bit length of maximum absolute value
-//         int bitLength = 0;
-//         if (maxAbsCoeff > 0) {
-//             bitLength = 64 - __builtin_clzll(static_cast<uint64_t>(maxAbsCoeff));
-//         }
+        // Calculate bit length of maximum absolute value
+        int bitLength = 0;
+        if (maxAbsCoeff > 0) {
+            bitLength = 64 - __builtin_clzll(static_cast<uint64_t>(maxAbsCoeff));
+        }
         
-//         std::cout << "    Max |coefficient| (balanced): " << maxAbsCoeff 
-//                   << " (" << bitLength << " bits)" << std::endl;
+        std::cout << "    Max |coefficient| (balanced): " << maxAbsCoeff 
+                  << " (" << bitLength << " bits)" << std::endl;
 
-//         for (size_t j = 0; j < std::min<size_t>(len, 32); j++)
-//             std::cout << vals[j] << " ";
-//         if (len > 32)
-//             std::cout << "...";
-//         std::cout << std::endl;
-//     }
-//     std::cout << std::endl;
-// }
-
-
+        for (size_t j = 0; j < std::min<size_t>(len, 32); j++)
+            std::cout << vals[j] << " ";
+        if (len > 32)
+            std::cout << "...";
+        std::cout << std::endl;
+    }
+    std::cout << std::endl;
+}
 
 KeyPair<DCRTPoly> PKEBFVRNS::KeyGenInternalSpecial(CryptoContext<DCRTPoly> cc,
                                                    const std::string& shareType,
@@ -550,13 +548,16 @@ std::shared_ptr<std::vector<DCRTPoly>> PKEBFVRNS::BFMEncryptZeroCore(const Publi
 
     std::random_device rd;
     std::mt19937 rng(rd());
-    const int32_t Bsmall = 3;
+    const int32_t Bsmall = 1;
 
     DCRTPoly v  = GenSmallUniformDCRT(elementParams, ringDim, Bsmall, rng);
     DCRTPoly e0 = GenSmallUniformDCRT(elementParams, ringDim, Bsmall, rng);
     DCRTPoly e1 = GenSmallUniformDCRT(elementParams, ringDim, Bsmall, rng);
-
     const auto ns = cryptoParams->GetNoiseScale();
+
+    PrintDCRTPoly(v, "bfm encryption: v");
+    PrintDCRTPoly(e0, "bfm encryption: e0");
+    PrintDCRTPoly(e1, "bfm encryption: e1");
 
     uint32_t sizeQ  = pk[0].GetParams()->GetParams().size();
     uint32_t sizeQl = elementParams->GetParams().size();
