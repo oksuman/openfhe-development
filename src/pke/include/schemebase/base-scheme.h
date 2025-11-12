@@ -254,6 +254,18 @@ public:
         return m_PKE->DecryptCore(ciphertext->GetElements(), privateKey);
     }
 
+    // ============================================================
+    // Added: BFM+25 ThFHE encryption algorithm (forwarders in SchemeBase)
+    // ============================================================
+    virtual Ciphertext<Element> BFMEncrypt(const Element& plaintext, const PublicKey<Element> publicKey) const {
+        VerifyPKEEnabled(__func__);
+        return m_PKE->BFMEncrypt(plaintext, publicKey);
+    }
+    // ============================================================
+    // End of BFM+25 ThFHE encryption algorithm
+    // ============================================================
+
+
     /////////////////////////////////////////
     // KEY SWITCH WRAPPER
     /////////////////////////////////////////

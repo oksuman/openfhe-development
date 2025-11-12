@@ -222,4 +222,24 @@ DCRTPoly PKERNS::DecryptCore(const std::vector<DCRTPoly>& cv, const PrivateKey<D
     return b;
 }
 
+// ============================================================
+// Added: BFM+25 ThFHE encryption algorithm (BFMEncrypt / EncryptZeroCoreBFM)
+// ============================================================
+Ciphertext<DCRTPoly> PKERNS::BFMEncrypt(DCRTPoly plaintext, const PublicKey<DCRTPoly> publicKey) const {
+    Ciphertext<DCRTPoly> ciphertext(std::make_shared<CiphertextImpl<DCRTPoly>>(publicKey));
+    std::shared_ptr<std::vector<DCRTPoly>> ba = BFMEncryptZeroCore(publicKey, plaintext.GetParams());
+    plaintext.SetFormat(EVALUATION);
+    (*ba)[0] += plaintext;
+    ciphertext->SetElements({std::move((*ba)[0]), std::move((*ba)[1])});
+    ciphertext->SetNoiseScaleDeg(1);
+    return ciphertext;
+}
+std::shared_ptr<std::vector<DCRTPoly>> PKERNS::BFMEncryptZeroCore(const PublicKey<DCRTPoly> publicKey,
+                                                                  const std::shared_ptr<ParmType> params) const {
+    OPENFHE_THROW("EncryptZeroCoreBFM(publicKey) not implemented for this scheme.");
+}
+// ============================================================
+// End of BFM+25 ThFHE encryption algorithm
+// ============================================================
+
 }  // namespace lbcrypto

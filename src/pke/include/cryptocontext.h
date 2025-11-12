@@ -1329,6 +1329,37 @@ public:
         return Encrypt(plaintext, privateKey);
     }
 
+
+    // ============================================================
+    // Added: BFM+25 ThFHE encryption algorithm (BFMEncrypt)
+    // ============================================================
+
+    Ciphertext<Element> BFMEncrypt(ConstPlaintext& plaintext, const PublicKey<Element>& publicKey) const {
+        if (plaintext == nullptr)
+            OPENFHE_THROW("Input plaintext is nullptr");
+        ValidateKey(publicKey);
+
+        Ciphertext<Element> ciphertext = GetScheme()->BFMEncrypt(plaintext->GetElement<Element>(), publicKey);
+
+        if (ciphertext) {
+            ciphertext->SetSlots(plaintext->GetSlots());
+            ciphertext->SetLevel(plaintext->GetLevel());
+            ciphertext->SetNoiseScaleDeg(plaintext->GetNoiseScaleDeg());
+            ciphertext->SetScalingFactor(plaintext->GetScalingFactor());
+            ciphertext->SetScalingFactorInt(plaintext->GetScalingFactorInt());
+            ciphertext->SetEncodingType(plaintext->GetEncodingType());
+        }
+
+        return ciphertext;
+    }
+    Ciphertext<Element> BFMEncrypt(const PublicKey<Element>& publicKey, ConstPlaintext& plaintext) const {
+        return BFMEncrypt(plaintext, publicKey);
+    }
+    // ============================================================
+    // End of BFM+25 ThFHE encryption algorithm
+    // ============================================================
+
+
     /**
     * @brief Decrypts a ciphertext using the given private key.
     *

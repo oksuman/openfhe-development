@@ -145,6 +145,16 @@ public:
                                                                    const std::shared_ptr<ParmType> params) const;
 
     virtual Element DecryptCore(const std::vector<Element>& cv, const PrivateKey<Element> privateKey) const;
+
+    // ============================================================
+    // Added: BFM+25 ThFHE encryption algorithm (BFMEncrypt / EncryptZeroCoreBFM)
+    // ============================================================
+    virtual Ciphertext<Element> BFMEncrypt(Element plaintext, const PublicKey<Element> publicKey) const;
+    virtual std::shared_ptr<std::vector<Element>> BFMEncryptZeroCore(const PublicKey<Element> publicKey,
+                                                                    const std::shared_ptr<ParmType> params) const;
+    // ============================================================
+    // End of BFM+25 ThFHE encryption algorithm
+    // ============================================================
 };
 
 }  // namespace lbcrypto

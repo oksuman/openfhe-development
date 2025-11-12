@@ -126,6 +126,17 @@ public:
     std::string SerializedObjectName() const {
         return "PKEBFVRNS";
     }
+    // ============================================================
+    // Added: BFM+25 ThFHE encryption algorithm (BFMEncrypt / EncryptZeroCoreBFM)
+    // ============================================================
+    Ciphertext<DCRTPoly> BFMEncrypt(DCRTPoly plaintext, const PublicKey<DCRTPoly> publicKey) const override;
+    std::shared_ptr<std::vector<DCRTPoly>> BFMEncryptZeroCore(const PublicKey<DCRTPoly> publicKey,
+                                                            const std::shared_ptr<ParmType> params) const override;
+
+    // ============================================================
+    // End of BFM+25 ThFHE encryption algorithm
+    // ============================================================
+
 };
 }  // namespace lbcrypto
 

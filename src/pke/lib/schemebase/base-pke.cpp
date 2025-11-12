@@ -200,6 +200,23 @@ Element PKEBase<Element>::DecryptCore(const std::vector<Element>& cv, const Priv
     return b;
 }
 
+
+// ============================================================
+// Added: BFM+25 ThFHE encryption algorithm (BFMEncrypt / EncryptZeroCoreBFM)
+// ============================================================
+template <class Element>
+Ciphertext<Element> PKEBase<Element>::BFMEncrypt(Element plaintext, const PublicKey<Element> publicKey) const {
+    OPENFHE_THROW("BFMEncrypt(publicKey) not implemented for this scheme.");
+}
+template <class Element>
+std::shared_ptr<std::vector<Element>> PKEBase<Element>::BFMEncryptZeroCore(const PublicKey<Element> publicKey,
+                                                                           const std::shared_ptr<ParmType> params) const {
+    OPENFHE_THROW("EncryptZeroCoreBFM(publicKey) not implemented for this scheme.");
+}
+// ============================================================
+// End of BFM+25 ThFHE encryption algorithm
+// ======================================================
+
 }  // namespace lbcrypto
 
 // the code below is from base-pke-impl.cpp

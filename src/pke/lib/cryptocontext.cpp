@@ -931,38 +931,227 @@ DecryptResult CryptoContextImpl<DCRTPoly>::MultipartyDecryptFusionDistributed(
         return result;
     }
 
+    // // =========================
+    // // 2adic:
+    // // =========================
+    // else if (shareType == "2adic") {
+    //     const uint64_t Lexp = static_cast<uint64_t>(threshold - 1);
+    //     const uint64_t two_n = 2ULL * static_cast<uint64_t>(Ndim);
+
+    //     uint64_t M = 1;
+    //     while (M < static_cast<uint64_t>(N))
+    //         M <<= 1;
+
+    //     const uint64_t h = two_n / M;  // ω = X^h
+
+    //     std::vector<DCRTPoly> alphas;
+    //     alphas.reserve(L);
+    //     for (size_t j = 0; j < L; ++j) {
+    //         const uint64_t cid = static_cast<uint64_t>(client_indexes[j]);
+
+    //         // σ = h * cid 
+    //         const unsigned __int128 sigma =
+    //             static_cast<unsigned __int128>(h) * static_cast<unsigned __int128>(cid);
+
+    //         const uint64_t r       = static_cast<uint64_t>(sigma % Ndim);
+    //         const bool     negWrap = (static_cast<unsigned __int128>(sigma / Ndim) & 1) != 0;
+
+    //         DCRTPoly alpha(elementParams, Format::COEFFICIENT, true);
+    //         for (size_t k = 0; k < vecSize; ++k) {
+    //             auto pk     = elementParams->GetParams()[k];
+    //             auto modq_k = pk->GetModulus();
+
+    //             NativePoly mono(pk, Format::COEFFICIENT, true);
+    //             mono[r] = negWrap ? (modq_k - 1) : NativeInteger(1); // X^r or -X^r
+    //             alpha.SetElementAtIndex(k, std::move(mono));
+    //         }
+    //         alphas.emplace_back(std::move(alpha));
+    //     }
+
+    //     std::vector<DCRTPoly> Ljs;
+    //     Ljs.reserve(L);
+
+    //     for (size_t j = 0; j < L; ++j) {
+    //         DCRTPoly NumeratorEval(elementParams, Format::COEFFICIENT, true);
+    //         DCRTPoly DenominatorEval(elementParams, Format::COEFFICIENT, true);
+    //         for (size_t k = 0; k < vecSize; ++k) {
+    //             auto pk = elementParams->GetParams()[k];
+    //             NativePoly one(pk, Format::COEFFICIENT, true);
+    //             one[0] = NativeInteger(1);
+    //             NumeratorEval.SetElementAtIndex(k, one);
+    //             DenominatorEval.SetElementAtIndex(k, one);
+    //         }
+    //         NumeratorEval.SetFormat(Format::EVALUATION);
+    //         DenominatorEval.SetFormat(Format::EVALUATION);
+
+    //         // compute numerator and denominator products
+    //         for (size_t i = 0; i < L; ++i) {
+    //             if (i == j)
+    //                 continue;
+
+    //             DCRTPoly negAlphaI = alphas[i].Negate();
+    //             DCRTPoly denom = alphas[j].Minus(alphas[i]);
+
+    //             negAlphaI.SetFormat(Format::EVALUATION);
+    //             denom.SetFormat(Format::EVALUATION);
+
+    //             NumeratorEval *= negAlphaI;
+    //             DenominatorEval *= denom;
+    //         }
+
+    //         // compute denominator inverse
+    //         DCRTPoly DenInvEval(elementParams, Format::EVALUATION, true);
+    //         for (size_t k = 0; k < vecSize; ++k) {
+    //             auto& den_k = DenominatorEval.GetElementAtIndex(k);
+    //             auto vals = den_k.GetValues();
+    //             auto pk = elementParams->GetParams()[k];
+    //             auto modq_k = pk->GetModulus();
+    //             usint len = vals.GetLength();
+
+    //             NativeVector invVals(len, modq_k);
+    //             for (usint s = 0; s < len; ++s)
+    //                 invVals[s] = vals[s].ModInverse(modq_k);
+
+    //             NativePoly invPoly(pk, Format::EVALUATION, true);
+    //             invPoly.SetValues(std::move(invVals), Format::EVALUATION);
+    //             DenInvEval.SetElementAtIndex(k, std::move(invPoly));
+    //         }
+
+    //         // compute L_j
+    //         DCRTPoly Lj = NumeratorEval * DenInvEval;
+
+    //         // compute clearing factor δ = 2^{t-1} (per tower)
+    //         DCRTPoly Delta(elementParams, Format::COEFFICIENT, true);
+    //         for (size_t k = 0; k < vecSize; ++k) {
+    //             auto params_k = elementParams->GetParams()[k];
+    //             auto modq_k = params_k->GetModulus();
+    //             NativeInteger pow2L = NativeInteger(2).ModExp(NativeInteger(Lexp), modq_k);
+    //             NativePoly poly(params_k, Format::COEFFICIENT, true);
+    //             poly[0] = pow2L;
+    //             Delta.SetElementAtIndex(k, std::move(poly));
+    //         }
+    //         Delta.SetFormat(Format::EVALUATION);
+
+    //         DCRTPoly LjCleared = Lj * Delta;
+    //         DCRTPoly DeltaDenInvEval = DenInvEval * Delta;
+
+    //         if (denomClear)
+    //             Lj = std::move(LjCleared);
+
+    //         Ljs.emplace_back(std::move(Lj));
+    //     }
+
+    //     DCRTPoly fusedSum(elementParams, Format::EVALUATION, true);
+    //     for (size_t j = 0; j < L; ++j) {
+    //         const uint32_t pid = client_indexes[j];
+    //         auto it = partials.find(pid);
+    //         if (it == partials.end())
+    //             OPENFHE_THROW("Missing partial share for a listed client index");
+
+    //         const auto& ctj = it->second;
+    //         const auto& elems = ctj->GetElements();
+    //         if (elems.size() < 1)
+    //             OPENFHE_THROW("Partial ciphertext must have a single element (s_i*c1 + noise)");
+
+    //         DCRTPoly sharePoly = elems[0];
+    //         sharePoly.SetFormat(Format::EVALUATION);
+
+    //         fusedSum += Ljs[j] * sharePoly;
+    //     }
+
+    //     if (denomClear) {
+    //         DCRTPoly TwoLConst(elementParams, Format::COEFFICIENT, true);
+    //         for (size_t k = 0; k < vecSize; ++k) {
+    //             auto params_k = elementParams->GetParams()[k];
+    //             auto modq_k = params_k->GetModulus();
+    //             NativeInteger pow2L = NativeInteger(2).ModExp(NativeInteger(Lexp), modq_k);
+    //             NativePoly poly(params_k, Format::COEFFICIENT, true);
+    //             poly[0] = pow2L;
+    //             TwoLConst.SetElementAtIndex(k, std::move(poly));
+    //         }
+    //         TwoLConst.SetFormat(Format::EVALUATION);
+    //         fusedSum += c0 * TwoLConst;
+    //     } else {
+    //         fusedSum += c0;
+    //     }
+    //     auto fusedCt = ciphertext->CloneEmpty();
+    //     fusedCt->SetElement(std::move(fusedSum));
+
+    //     Plaintext decrypted = CryptoContextImpl<DCRTPoly>::GetPlaintextForDecrypt(
+    //         fusedCt->GetEncodingType(),
+    //         fusedCt->GetElements()[0].GetParams(),
+    //         this->GetEncodingParams(),
+    //         this->GetCKKSDataType());
+
+    //     if ((fusedCt->GetEncodingType() == CKKS_PACKED_ENCODING) &&
+    //         (fusedCt->GetElements()[0].GetParams()->GetParams().size() > 1))
+    //         result = GetScheme()->MultipartyDecryptFusion(std::vector<Ciphertext<DCRTPoly>>{fusedCt},
+    //                                                     &decrypted->GetElement<Poly>());
+    //     else
+    //         result = GetScheme()->MultipartyDecryptFusion(std::vector<Ciphertext<DCRTPoly>>{fusedCt},
+    //                                                     &decrypted->GetElement<NativePoly>());
+
+    //     if (!result.isValid)
+    //         return result;
+
+    //     decrypted->SetScalingFactorInt(result.scalingFactorInt);
+
+    //     if (fusedCt->GetEncodingType() == CKKS_PACKED_ENCODING) {
+    //         auto decryptedCKKS = std::dynamic_pointer_cast<CKKSPackedEncoding>(decrypted);
+    //         decryptedCKKS->SetSlots(ciphertext->GetSlots());
+    //         const auto cryptoParamsCKKS =
+    //             std::dynamic_pointer_cast<CryptoParametersCKKSRNS>(this->GetCryptoParameters());
+    //         decryptedCKKS->Decode(ciphertext->GetNoiseScaleDeg(), ciphertext->GetScalingFactor(),
+    //                             cryptoParamsCKKS->GetScalingTechnique(),
+    //                             cryptoParamsCKKS->GetExecutionMode());
+    //     } else {
+    //         decrypted->Decode();
+    //     }
+
+    //     *plaintext = std::move(decrypted);
+    //     return result;
+    // }
     // =========================
     // 2adic:
     // =========================
     else if (shareType == "2adic") {
-        const uint64_t Lexp = static_cast<uint64_t>(threshold - 1);
+        const auto& params = elementParams;
+        const usint Ndim   = params->GetRingDimension(); // n
         const uint64_t two_n = 2ULL * static_cast<uint64_t>(Ndim);
+        const uint64_t Lexp = static_cast<uint64_t>(threshold - 1);
 
+        // M = 2^{ceil(log2 N)}  (divides 2n)
         uint64_t M = 1;
         while (M < static_cast<uint64_t>(N))
             M <<= 1;
+        const uint64_t d = two_n / M;  // step size
 
-        const uint64_t h = two_n / M;  // ω = X^h
+        // s = 2^{floor(log2(M/(2t)))}, minimum 1
+        uint64_t scand = (M / (2ULL * static_cast<uint64_t>(threshold)));
+        if (scand == 0) scand = 1;
+        uint64_t s = 1;
+        while ((s << 1) <= scand) s <<= 1;
+
+        // offsets r ∈ Z/2nZ, r' ∈ Z/MZ  (fixed to 0 for determinism)
+        uint64_t r  = 1;
+        uint64_t rp = 1;
 
         std::vector<DCRTPoly> alphas;
         alphas.reserve(L);
         for (size_t j = 0; j < L; ++j) {
-            const uint64_t cid = static_cast<uint64_t>(client_indexes[j]);
+            const uint64_t u = static_cast<uint64_t>(client_indexes[j] - 1);
+            const uint64_t a = (r + d * ((rp + u * s) % M)) % two_n;
 
-            // σ = h * cid 
-            const unsigned __int128 sigma =
-                static_cast<unsigned __int128>(h) * static_cast<unsigned __int128>(cid);
+            const uint64_t rshift = a % Ndim;
+            const bool negWrap = ((a / Ndim) & 1) != 0;
 
-            const uint64_t r       = static_cast<uint64_t>(sigma % Ndim);
-            const bool     negWrap = (static_cast<unsigned __int128>(sigma / Ndim) & 1) != 0;
-
-            DCRTPoly alpha(elementParams, Format::COEFFICIENT, true);
+            DCRTPoly alpha(params, Format::COEFFICIENT, true);
             for (size_t k = 0; k < vecSize; ++k) {
-                auto pk     = elementParams->GetParams()[k];
+                auto pk     = params->GetParams()[k];
                 auto modq_k = pk->GetModulus();
 
                 NativePoly mono(pk, Format::COEFFICIENT, true);
-                mono[r] = negWrap ? (modq_k - 1) : NativeInteger(1); // X^r or -X^r
+                mono[rshift] = negWrap ? (modq_k - 1) : NativeInteger(1); // X^r or -X^r
                 alpha.SetElementAtIndex(k, std::move(mono));
             }
             alphas.emplace_back(std::move(alpha));
@@ -972,10 +1161,10 @@ DecryptResult CryptoContextImpl<DCRTPoly>::MultipartyDecryptFusionDistributed(
         Ljs.reserve(L);
 
         for (size_t j = 0; j < L; ++j) {
-            DCRTPoly NumeratorEval(elementParams, Format::COEFFICIENT, true);
-            DCRTPoly DenominatorEval(elementParams, Format::COEFFICIENT, true);
+            DCRTPoly NumeratorEval(params, Format::COEFFICIENT, true);
+            DCRTPoly DenominatorEval(params, Format::COEFFICIENT, true);
             for (size_t k = 0; k < vecSize; ++k) {
-                auto pk = elementParams->GetParams()[k];
+                auto pk = params->GetParams()[k];
                 NativePoly one(pk, Format::COEFFICIENT, true);
                 one[0] = NativeInteger(1);
                 NumeratorEval.SetElementAtIndex(k, one);
@@ -984,7 +1173,6 @@ DecryptResult CryptoContextImpl<DCRTPoly>::MultipartyDecryptFusionDistributed(
             NumeratorEval.SetFormat(Format::EVALUATION);
             DenominatorEval.SetFormat(Format::EVALUATION);
 
-            // compute numerator and denominator products
             for (size_t i = 0; i < L; ++i) {
                 if (i == j)
                     continue;
@@ -999,12 +1187,12 @@ DecryptResult CryptoContextImpl<DCRTPoly>::MultipartyDecryptFusionDistributed(
                 DenominatorEval *= denom;
             }
 
-            // compute denominator inverse
-            DCRTPoly DenInvEval(elementParams, Format::EVALUATION, true);
+            // denominator inverse
+            DCRTPoly DenInvEval(params, Format::EVALUATION, true);
             for (size_t k = 0; k < vecSize; ++k) {
                 auto& den_k = DenominatorEval.GetElementAtIndex(k);
                 auto vals = den_k.GetValues();
-                auto pk = elementParams->GetParams()[k];
+                auto pk = params->GetParams()[k];
                 auto modq_k = pk->GetModulus();
                 usint len = vals.GetLength();
 
@@ -1017,13 +1205,12 @@ DecryptResult CryptoContextImpl<DCRTPoly>::MultipartyDecryptFusionDistributed(
                 DenInvEval.SetElementAtIndex(k, std::move(invPoly));
             }
 
-            // compute L_j
             DCRTPoly Lj = NumeratorEval * DenInvEval;
 
-            // compute clearing factor δ = 2^{t-1} (per tower)
-            DCRTPoly Delta(elementParams, Format::COEFFICIENT, true);
+            // clearing factor δ = 2^{t-1}
+            DCRTPoly Delta(params, Format::COEFFICIENT, true);
             for (size_t k = 0; k < vecSize; ++k) {
-                auto params_k = elementParams->GetParams()[k];
+                auto params_k = params->GetParams()[k];
                 auto modq_k = params_k->GetModulus();
                 NativeInteger pow2L = NativeInteger(2).ModExp(NativeInteger(Lexp), modq_k);
                 NativePoly poly(params_k, Format::COEFFICIENT, true);
@@ -1041,7 +1228,7 @@ DecryptResult CryptoContextImpl<DCRTPoly>::MultipartyDecryptFusionDistributed(
             Ljs.emplace_back(std::move(Lj));
         }
 
-        DCRTPoly fusedSum(elementParams, Format::EVALUATION, true);
+        DCRTPoly fusedSum(params, Format::EVALUATION, true);
         for (size_t j = 0; j < L; ++j) {
             const uint32_t pid = client_indexes[j];
             auto it = partials.find(pid);
@@ -1051,18 +1238,17 @@ DecryptResult CryptoContextImpl<DCRTPoly>::MultipartyDecryptFusionDistributed(
             const auto& ctj = it->second;
             const auto& elems = ctj->GetElements();
             if (elems.size() < 1)
-                OPENFHE_THROW("Partial ciphertext must have a single element (s_i*c1 + noise)");
+                OPENFHE_THROW("Partial ciphertext must have a single element");
 
             DCRTPoly sharePoly = elems[0];
             sharePoly.SetFormat(Format::EVALUATION);
-
             fusedSum += Ljs[j] * sharePoly;
         }
 
         if (denomClear) {
-            DCRTPoly TwoLConst(elementParams, Format::COEFFICIENT, true);
+            DCRTPoly TwoLConst(params, Format::COEFFICIENT, true);
             for (size_t k = 0; k < vecSize; ++k) {
-                auto params_k = elementParams->GetParams()[k];
+                auto params_k = params->GetParams()[k];
                 auto modq_k = params_k->GetModulus();
                 NativeInteger pow2L = NativeInteger(2).ModExp(NativeInteger(Lexp), modq_k);
                 NativePoly poly(params_k, Format::COEFFICIENT, true);
@@ -1075,9 +1261,6 @@ DecryptResult CryptoContextImpl<DCRTPoly>::MultipartyDecryptFusionDistributed(
             fusedSum += c0;
         }
 
-        // fusedSum.SetFormat(Format::COEFFICIENT);
-        // PrintDCRTPoly(fusedSum, "Distributed decryption result");
-        // fusedSum.SetFormat(Format::EVALUATION);
         auto fusedCt = ciphertext->CloneEmpty();
         fusedCt->SetElement(std::move(fusedSum));
 
@@ -1115,6 +1298,9 @@ DecryptResult CryptoContextImpl<DCRTPoly>::MultipartyDecryptFusionDistributed(
         *plaintext = std::move(decrypted);
         return result;
     }
+
+
+
     // ===========================================
     // BFM+25: c0(+Δ) + Σ( L_j(0)(·Δ) · partial_j )
     // ===========================================
@@ -1814,6 +2000,80 @@ std::unordered_map<uint32_t, DCRTPoly> CryptoContextImpl<DCRTPoly>::ShareKeysDea
         }
     }
 
+    // // -------------------------
+    // // 2adic  
+    // // -------------------------
+    // else if (shareType == "2adic") {
+    //     std::vector<DCRTPoly> fs{sk->GetPrivateElement()};
+    //     fs.back().SetFormat(Format::COEFFICIENT);
+
+    //     fs.reserve(threshold);
+    //     typename DCRTPoly::DugType dug;
+    //     for (size_t t = 1; t < threshold; ++t)
+    //         fs.emplace_back(dug, elementParams, Format::COEFFICIENT);
+
+    //     const usint Ndim = elementParams->GetRingDimension();
+    //     uint64_t M = 1;
+    //     while (M < static_cast<uint64_t>(N))
+    //         M <<= 1;
+    //     const uint64_t h = (2ULL * static_cast<uint64_t>(Ndim)) / M;
+            
+    //     for (size_t pid = 1; pid <= N; ++pid) {
+    //         DCRTPoly feval(elementParams, Format::COEFFICIENT, true);
+
+    //         for (size_t k = 0; k < vecSize; ++k) {
+    //             auto params_k = elementParams->GetParams()[k];
+    //             auto modq_k   = params_k->GetModulus();
+
+    //             NativePoly fevalpoly(params_k, Format::COEFFICIENT, true);
+    //             fevalpoly += fs[0].GetElementAtIndex(k); // constant term
+
+    //             const unsigned __int128 sigma = static_cast<unsigned __int128>(h) * static_cast<unsigned __int128>(pid);
+
+    //             for (size_t t = 1; t < threshold; ++t) {
+    //                 // const uint64_t sigma = (2ULL * pid - 1ULL);        // odd sigmas
+    //                 // const uint64_t e     = sigma * static_cast<uint64_t>(t);
+
+    //                 const unsigned __int128 e = sigma * static_cast<unsigned __int128>(t); // e = σ·t
+    //                 const uint64_t r  = e % Ndim;   // shift
+    //                 const bool neg    = ((e / Ndim) & 1ULL) != 0ULL;
+
+    //                 const auto& coeff_poly = fs[t].GetElementAtIndex(k);
+    //                 NativePoly rotated(params_k, Format::COEFFICIENT, true);
+
+    //                 // rotation: coeff(x) * x^r   (negacyclic version, x^N = -1)
+    //                 for (size_t j = 0; j < Ndim; ++j) {
+    //                     const auto cj = coeff_poly[j];
+    //                     if (cj == NativeInteger(0)) continue;
+
+    //                     size_t sum = j + r;
+    //                     bool wrap  = (sum >= Ndim);
+    //                     size_t idx = wrap ? (sum - Ndim) : sum;
+
+    //                     auto val = cj;
+    //                     if (wrap)  // if term wraps past N, flip sign because x^N = -1
+    //                         val = modq_k - val;
+
+    //                     rotated[idx] += val;
+    //                 }
+
+    //                 // apply global sign flip  (-1)^{floor(e/N)}
+    //                 if (neg) {
+    //                     for (size_t j = 0; j < Ndim; ++j) {
+    //                         if (!(rotated[j] == NativeInteger(0)))
+    //                             rotated[j] = modq_k - rotated[j];
+    //                     }
+    //                 }
+
+    //                 fevalpoly += rotated;
+    //             }
+
+    //             feval.SetElementAtIndex(k, std::move(fevalpoly));
+    //         }
+
+    //         SecretShares.emplace(pid, std::move(feval));
+    //     }
+    // }
     // -------------------------
     // 2adic  
     // -------------------------
@@ -1826,52 +2086,61 @@ std::unordered_map<uint32_t, DCRTPoly> CryptoContextImpl<DCRTPoly>::ShareKeysDea
         for (size_t t = 1; t < threshold; ++t)
             fs.emplace_back(dug, elementParams, Format::COEFFICIENT);
 
-        const usint Ndim = elementParams->GetRingDimension();
+        const auto& params = elementParams;
+        const usint Ndim   = params->GetRingDimension(); // n
+        const uint64_t two_n = 2ULL * static_cast<uint64_t>(Ndim);
+
         uint64_t M = 1;
         while (M < static_cast<uint64_t>(N))
             M <<= 1;
-        const uint64_t h = (2ULL * static_cast<uint64_t>(Ndim)) / M;
+        const uint64_t d = two_n / M;
+
+        uint64_t scand = (M / (2ULL * static_cast<uint64_t>(threshold)));
+        if (scand == 0) scand = 1;
+        uint64_t s = 1;
+        while ((s << 1) <= scand) s <<= 1;
+
+        uint64_t r  = 1;
+        uint64_t rp = 1;
             
         for (size_t pid = 1; pid <= N; ++pid) {
-            DCRTPoly feval(elementParams, Format::COEFFICIENT, true);
+            const uint64_t u = pid - 1;
+            const uint64_t a = (r + d * ((rp + u * s) % M)) % two_n;
+            std::cout << "pid=" << pid << ", a=" << a << std::endl;
+
+            DCRTPoly feval(params, Format::COEFFICIENT, true);
 
             for (size_t k = 0; k < vecSize; ++k) {
-                auto params_k = elementParams->GetParams()[k];
+                auto params_k = params->GetParams()[k];
                 auto modq_k   = params_k->GetModulus();
 
                 NativePoly fevalpoly(params_k, Format::COEFFICIENT, true);
                 fevalpoly += fs[0].GetElementAtIndex(k); // constant term
 
-                const unsigned __int128 sigma = static_cast<unsigned __int128>(h) * static_cast<unsigned __int128>(pid);
-
                 for (size_t t = 1; t < threshold; ++t) {
-                    // const uint64_t sigma = (2ULL * pid - 1ULL);        // odd sigmas
-                    // const uint64_t e     = sigma * static_cast<uint64_t>(t);
-
-                    const unsigned __int128 e = sigma * static_cast<unsigned __int128>(t); // e = σ·t
-                    const uint64_t r  = e % Ndim;   // shift
-                    const bool neg    = ((e / Ndim) & 1ULL) != 0ULL;
+                    const unsigned __int128 e = static_cast<unsigned __int128>(a) * static_cast<unsigned __int128>(t);
+                    const uint64_t rshift = e % Ndim;
+                    const bool neg = ((e / Ndim) & 1ULL) != 0ULL;
 
                     const auto& coeff_poly = fs[t].GetElementAtIndex(k);
                     NativePoly rotated(params_k, Format::COEFFICIENT, true);
 
-                    // rotation: coeff(x) * x^r   (negacyclic version, x^N = -1)
+                    // rotation: coeff(x) * x^r   (negacyclic, x^N = -1)
                     for (size_t j = 0; j < Ndim; ++j) {
                         const auto cj = coeff_poly[j];
                         if (cj == NativeInteger(0)) continue;
 
-                        size_t sum = j + r;
+                        size_t sum = j + rshift;
                         bool wrap  = (sum >= Ndim);
                         size_t idx = wrap ? (sum - Ndim) : sum;
 
                         auto val = cj;
-                        if (wrap)  // if term wraps past N, flip sign because x^N = -1
+                        if (wrap)  // wrap → flip sign
                             val = modq_k - val;
 
                         rotated[idx] += val;
                     }
 
-                    // apply global sign flip  (-1)^{floor(e/N)}
                     if (neg) {
                         for (size_t j = 0; j < Ndim; ++j) {
                             if (!(rotated[j] == NativeInteger(0)))
@@ -1888,6 +2157,7 @@ std::unordered_map<uint32_t, DCRTPoly> CryptoContextImpl<DCRTPoly>::ShareKeysDea
             SecretShares.emplace(pid, std::move(feval));
         }
     }
+
 
     return SecretShares;
 }
@@ -2090,30 +2360,135 @@ void CryptoContextImpl<DCRTPoly>::RecoverSharedKeyDealer(
         sk->SetPrivateElement(std::move(s_rec));
     }
 
+    // // -------------------------
+    // // 2adic  (reconstruct at x=0 using S = {ω^cid}, ω = X^h)
+    // // -------------------------
+    // else if (shareType == "2adic") {
+    //     const auto& params = elementParams;
+    //     const usint Ndim   = params->GetRingDimension(); // n
+    //     const uint64_t two_n = 2ULL * static_cast<uint64_t>(Ndim);
+
+    //     // M = 2^{ceil(log2 N)} with M | 2n 
+    //     uint64_t M = 1;
+    //     while (M < static_cast<uint64_t>(N)) M <<= 1;
+    //     if (two_n % M != 0ULL) OPENFHE_THROW("2-adic: M must divide 2n.");
+
+    //     const uint64_t h = two_n / M;  // ω = X^h
+
+    //     // Build α_j = X^{h*cid_j} reduced mod (X^n+1) → shift r = (h*cid) mod n, sign if wrap
+    //     std::vector<DCRTPoly> alphas;
+    //     alphas.reserve(L);
+    //     for (size_t j = 0; j < L; ++j) {
+    //         const uint64_t cid   = static_cast<uint64_t>(client_indexes[j]);
+    //         const unsigned __int128 sigma = static_cast<unsigned __int128>(h) * cid;
+
+    //         const uint64_t r       = static_cast<uint64_t>(sigma % Ndim);
+    //         const bool     negWrap = (static_cast<unsigned __int128>(sigma / Ndim) & 1) != 0;
+
+    //         DCRTPoly alpha(params, Format::COEFFICIENT, true);
+    //         for (size_t k = 0; k < vecSize; ++k) {
+    //             auto pk     = params->GetParams()[k];
+    //             auto modq_k = pk->GetModulus();
+
+    //             NativePoly mono(pk, Format::COEFFICIENT, true);
+    //             mono[r] = negWrap ? (modq_k - 1) : NativeInteger(1); // X^r or -X^r
+    //             alpha.SetElementAtIndex(k, std::move(mono));
+    //         }
+    //         alphas.emplace_back(std::move(alpha));
+    //     }
+
+    //     // Lagrange basis at x=0: Lj = ∏_{i≠j} (-α_i) * (α_j - α_i)^{-1}
+    //     std::vector<DCRTPoly> Ljs;
+    //     Ljs.reserve(L);
+
+    //     for (size_t j = 0; j < L; ++j) {
+    //         // Lj <- 1 (evaluation domain for element-wise mult/div)
+    //         DCRTPoly Lj(params, Format::COEFFICIENT, true);
+    //         for (size_t k = 0; k < vecSize; ++k) {
+    //             auto pk = params->GetParams()[k];
+    //             NativePoly one(pk, Format::COEFFICIENT, true);
+    //             one[0] = NativeInteger(1);
+    //             Lj.SetElementAtIndex(k, std::move(one));
+    //         }
+    //         Lj.SetFormat(Format::EVALUATION);
+
+    //         for (size_t i = 0; i < L; ++i) if (i != j) {
+    //             DCRTPoly negAlphaI = alphas[i].Negate();
+    //             DCRTPoly denom     = alphas[j].Minus(alphas[i]);
+
+    //             negAlphaI.SetFormat(Format::EVALUATION);
+    //             denom.SetFormat(Format::EVALUATION);
+
+    //             // denom^{-1} (component-wise in evaluation domain)
+    //             DCRTPoly denomInvEval(params, Format::EVALUATION, true);
+    //             for (size_t k = 0; k < vecSize; ++k) {
+    //                 auto       pk     = params->GetParams()[k];
+    //                 auto       modq_k = pk->GetModulus();
+    //                 const auto& den_k = denom.GetElementAtIndex(k);
+    //                 auto       vals   = den_k.GetValues();
+    //                 usint      len    = vals.GetLength();
+
+    //                 NativeVector invVals(len, modq_k);
+    //                 for (usint s = 0; s < len; ++s) {
+    //                     invVals[s] = vals[s].ModInverse(modq_k);
+    //                 }
+    //                 NativePoly invPoly(pk, Format::EVALUATION, true);
+    //                 invPoly.SetValues(std::move(invVals), Format::EVALUATION);
+    //                 denomInvEval.SetElementAtIndex(k, std::move(invPoly));
+    //             }
+
+    //             Lj *= negAlphaI;
+    //             Lj *= denomInvEval;
+    //         }
+
+    //         Lj.SetFormat(Format::COEFFICIENT);
+    //         Ljs.emplace_back(std::move(Lj));
+    //     }
+
+    //     // s_rec = Σ_j Lj * share_j  (share_j already equals f(α_j))
+    //     DCRTPoly s_rec(params, Format::COEFFICIENT, true);
+    //     for (size_t j = 0; j < L; ++j) {
+    //         DCRTPoly LjEval  = Ljs[j];                       LjEval.SetFormat(Format::EVALUATION);
+    //         DCRTPoly shEval  = sk_shares.at(client_indexes[j]); shEval.SetFormat(Format::EVALUATION);
+    //         DCRTPoly term    = LjEval * shEval;
+    //         term.SetFormat(Format::COEFFICIENT);
+    //         s_rec += term;
+    //     }
+
+    //     // store reconstructed secret (evaluation format if you use it elsewhere)
+    //     s_rec.SetFormat(Format::EVALUATION);
+    //     sk->SetPrivateElement(std::move(s_rec));
+    // }
     // -------------------------
-    // 2adic  (reconstruct at x=0 using S = {ω^cid}, ω = X^h)
+    // 2adic  (reconstruct at x=0 using S = {X^{a_u}})
     // -------------------------
     else if (shareType == "2adic") {
         const auto& params = elementParams;
         const usint Ndim   = params->GetRingDimension(); // n
         const uint64_t two_n = 2ULL * static_cast<uint64_t>(Ndim);
 
-        // M = 2^{ceil(log2 N)} with M | 2n 
         uint64_t M = 1;
         while (M < static_cast<uint64_t>(N)) M <<= 1;
         if (two_n % M != 0ULL) OPENFHE_THROW("2-adic: M must divide 2n.");
+        const uint64_t d = two_n / M;
 
-        const uint64_t h = two_n / M;  // ω = X^h
+        uint64_t scand = (M / (2ULL * static_cast<uint64_t>(threshold)));
+        if (scand == 0) scand = 1;
+        uint64_t s = 1;
+        while ((s << 1) <= scand) s <<= 1;
 
-        // Build α_j = X^{h*cid_j} reduced mod (X^n+1) → shift r = (h*cid) mod n, sign if wrap
+        uint64_t r  = 1;
+        uint64_t rp = 1;
+
+        // Build α_j = X^{a_u} reduced mod (X^n+1)
         std::vector<DCRTPoly> alphas;
         alphas.reserve(L);
         for (size_t j = 0; j < L; ++j) {
-            const uint64_t cid   = static_cast<uint64_t>(client_indexes[j]);
-            const unsigned __int128 sigma = static_cast<unsigned __int128>(h) * cid;
+            const uint64_t u = static_cast<uint64_t>(client_indexes[j] - 1);
+            const uint64_t a = (r + d * ((rp + u * s) % M)) % two_n;
 
-            const uint64_t r       = static_cast<uint64_t>(sigma % Ndim);
-            const bool     negWrap = (static_cast<unsigned __int128>(sigma / Ndim) & 1) != 0;
+            const uint64_t rshift = a % Ndim;
+            const bool negWrap = ((a / Ndim) & 1) != 0;
 
             DCRTPoly alpha(params, Format::COEFFICIENT, true);
             for (size_t k = 0; k < vecSize; ++k) {
@@ -2121,7 +2496,7 @@ void CryptoContextImpl<DCRTPoly>::RecoverSharedKeyDealer(
                 auto modq_k = pk->GetModulus();
 
                 NativePoly mono(pk, Format::COEFFICIENT, true);
-                mono[r] = negWrap ? (modq_k - 1) : NativeInteger(1); // X^r or -X^r
+                mono[rshift] = negWrap ? (modq_k - 1) : NativeInteger(1);
                 alpha.SetElementAtIndex(k, std::move(mono));
             }
             alphas.emplace_back(std::move(alpha));
@@ -2132,7 +2507,6 @@ void CryptoContextImpl<DCRTPoly>::RecoverSharedKeyDealer(
         Ljs.reserve(L);
 
         for (size_t j = 0; j < L; ++j) {
-            // Lj <- 1 (evaluation domain for element-wise mult/div)
             DCRTPoly Lj(params, Format::COEFFICIENT, true);
             for (size_t k = 0; k < vecSize; ++k) {
                 auto pk = params->GetParams()[k];
@@ -2149,7 +2523,6 @@ void CryptoContextImpl<DCRTPoly>::RecoverSharedKeyDealer(
                 negAlphaI.SetFormat(Format::EVALUATION);
                 denom.SetFormat(Format::EVALUATION);
 
-                // denom^{-1} (component-wise in evaluation domain)
                 DCRTPoly denomInvEval(params, Format::EVALUATION, true);
                 for (size_t k = 0; k < vecSize; ++k) {
                     auto       pk     = params->GetParams()[k];
@@ -2159,9 +2532,9 @@ void CryptoContextImpl<DCRTPoly>::RecoverSharedKeyDealer(
                     usint      len    = vals.GetLength();
 
                     NativeVector invVals(len, modq_k);
-                    for (usint s = 0; s < len; ++s) {
+                    for (usint s = 0; s < len; ++s)
                         invVals[s] = vals[s].ModInverse(modq_k);
-                    }
+
                     NativePoly invPoly(pk, Format::EVALUATION, true);
                     invPoly.SetValues(std::move(invVals), Format::EVALUATION);
                     denomInvEval.SetElementAtIndex(k, std::move(invPoly));
@@ -2175,20 +2548,20 @@ void CryptoContextImpl<DCRTPoly>::RecoverSharedKeyDealer(
             Ljs.emplace_back(std::move(Lj));
         }
 
-        // s_rec = Σ_j Lj * share_j  (share_j already equals f(α_j))
+        // s_rec = Σ_j Lj * share_j
         DCRTPoly s_rec(params, Format::COEFFICIENT, true);
         for (size_t j = 0; j < L; ++j) {
-            DCRTPoly LjEval  = Ljs[j];                       LjEval.SetFormat(Format::EVALUATION);
-            DCRTPoly shEval  = sk_shares.at(client_indexes[j]); shEval.SetFormat(Format::EVALUATION);
+            DCRTPoly LjEval  = Ljs[j];                           LjEval.SetFormat(Format::EVALUATION);
+            DCRTPoly shEval  = sk_shares.at(client_indexes[j]);  shEval.SetFormat(Format::EVALUATION);
             DCRTPoly term    = LjEval * shEval;
             term.SetFormat(Format::COEFFICIENT);
             s_rec += term;
         }
 
-        // store reconstructed secret (evaluation format if you use it elsewhere)
         s_rec.SetFormat(Format::EVALUATION);
         sk->SetPrivateElement(std::move(s_rec));
     }
+
 }
 
 // explicit template instantiations (including the instantiations reqiured for pybind11 binding)

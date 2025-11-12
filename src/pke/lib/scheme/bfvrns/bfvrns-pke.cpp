@@ -41,6 +41,8 @@ BFV implementation. See https://eprint.iacr.org/2021/204 for details.
 #include "scheme/bfvrns/bfvrns-cryptoparameters.h"
 #include "scheme/bfvrns/bfvrns-pke.h"
 
+#include <random>
+
 namespace lbcrypto {
 
 KeyPair<DCRTPoly> PKEBFVRNS::KeyGenInternal(CryptoContext<DCRTPoly> cc, bool makeSparse) const {
@@ -507,5 +509,136 @@ DecryptResult PKEBFVRNS::Decrypt(ConstCiphertext<DCRTPoly> ciphertext, const Pri
 
     return DecryptResult(plaintext->GetLength());
 }
+
+// ============================================================
+// Added: BFM+25 ThFHE encryption algorithm (BFMEncrypt / EncryptZeroCoreBFM)
+// ============================================================
+
+static NativeInteger SampleSmallBalanced(int32_t B, const NativeInteger& q, std::mt19937& rng) {
+    std::uniform_int_distribution<int32_t> dist(-B, B);
+    int32_t x = dist(rng);
+    if (x < 0)
+        return q - NativeInteger(static_cast<uint64_t>(-x));
+    else
+        return NativeInteger(static_cast<uint64_t>(x));
+}
+
+static DCRTPoly GenSmallUniformDCRT(const std::shared_ptr<ILDCRTParams<BigInteger>>& params,
+                                    usint ringDim, int32_t B, std::mt19937& rng) {
+    DCRTPoly out(params, Format::COEFFICIENT, true);
+    const auto& towers = params->GetParams();
+    for (size_t k = 0; k < towers.size(); ++k) {
+        auto pk     = towers[k];
+        auto modq_k = pk->GetModulus();
+        NativePoly epk(pk, Format::COEFFICIENT, true);
+        for (usint i = 0; i < ringDim; ++i)
+            epk[i] = SampleSmallBalanced(B, modq_k, rng);
+        out.SetElementAtIndex(k, std::move(epk));
+    }
+    out.SetFormat(Format::EVALUATION);
+    return out;
+}
+
+std::shared_ptr<std::vector<DCRTPoly>> PKEBFVRNS::BFMEncryptZeroCore(const PublicKey<DCRTPoly> publicKey,
+                                                                     const std::shared_ptr<ParmType> params) const {
+    const auto cryptoParams = std::dynamic_pointer_cast<CryptoParametersBFVRNS>(publicKey->GetCryptoParameters());
+    const std::vector<DCRTPoly>& pk = publicKey->GetPublicElements();
+
+    const std::shared_ptr<ParmType> elementParams =
+        (params == nullptr) ? cryptoParams->GetElementParams() : params;
+    const usint ringDim = elementParams->GetRingDimension();
+
+    std::random_device rd;
+    std::mt19937 rng(rd());
+    const int32_t Bsmall = 3;
+
+    DCRTPoly v  = GenSmallUniformDCRT(elementParams, ringDim, Bsmall, rng);
+    DCRTPoly e0 = GenSmallUniformDCRT(elementParams, ringDim, Bsmall, rng);
+    DCRTPoly e1 = GenSmallUniformDCRT(elementParams, ringDim, Bsmall, rng);
+
+    const auto ns = cryptoParams->GetNoiseScale();
+
+    uint32_t sizeQ  = pk[0].GetParams()->GetParams().size();
+    uint32_t sizeQl = elementParams->GetParams().size();
+
+    DCRTPoly c0, c1;
+    if (sizeQl != sizeQ) {
+        DCRTPoly p0 = pk[0].Clone();
+        DCRTPoly p1 = pk[1].Clone();
+        uint32_t diffQl = sizeQ - sizeQl;
+        p0.DropLastElements(diffQl);
+        p1.DropLastElements(diffQl);
+        c0 = p0 * v + ns * e0;
+        c1 = p1 * v + ns * e1;
+    }
+    else {
+        c0 = pk[0] * v + ns * e0;
+        c1 = pk[1] * v + ns * e1;
+    }
+
+    return std::make_shared<std::vector<DCRTPoly>>(std::initializer_list<DCRTPoly>({std::move(c0), std::move(c1)}));
+}
+
+Ciphertext<DCRTPoly> PKEBFVRNS::BFMEncrypt(DCRTPoly ptxt, const PublicKey<DCRTPoly> publicKey) const {
+    Ciphertext<DCRTPoly> ciphertext(std::make_shared<CiphertextImpl<DCRTPoly>>(publicKey));
+
+    const auto cryptoParams = std::dynamic_pointer_cast<CryptoParametersBFVRNS>(publicKey->GetCryptoParameters());
+
+    const auto elementParams = cryptoParams->GetElementParams();
+    size_t sizeQ             = elementParams->GetParams().size();
+
+    auto encParams = ptxt.GetParams();
+    size_t sizeP   = encParams->GetParams().size();
+
+    size_t level = sizeQ - sizeP;
+
+    std::vector<NativeInteger> tInvModq = cryptoParams->GettInvModq();
+    if (cryptoParams->GetEncryptionTechnique() == EXTENDED) {
+        encParams = cryptoParams->GetParamsQr();
+        ptxt.SetFormat(Format::COEFFICIENT);
+        Poly bigPtxt = ptxt.CRTInterpolate();
+        DCRTPoly plain(bigPtxt, encParams);
+        ptxt     = plain;
+        tInvModq = cryptoParams->GettInvModqr();
+    }
+    ptxt.SetFormat(Format::COEFFICIENT);
+
+    std::shared_ptr<std::vector<DCRTPoly>> ba = BFMEncryptZeroCore(publicKey, encParams);
+
+    NativeInteger NegQModt       = cryptoParams->GetNegQModt(level);
+    NativeInteger NegQModtPrecon = cryptoParams->GetNegQModtPrecon(level);
+
+    if (cryptoParams->GetEncryptionTechnique() == EXTENDED) {
+        NegQModt       = cryptoParams->GetNegQrModt();
+        NegQModtPrecon = cryptoParams->GetNegQrModtPrecon();
+    }
+
+    const NativeInteger t = cryptoParams->GetPlaintextModulus();
+
+    ptxt.TimesQovert(encParams, tInvModq, t, NegQModt, NegQModtPrecon);
+    ptxt.SetFormat(Format::EVALUATION);
+    (*ba)[0] += ptxt;
+
+    (*ba)[0].SetFormat(Format::COEFFICIENT);
+    (*ba)[1].SetFormat(Format::COEFFICIENT);
+
+    if (cryptoParams->GetEncryptionTechnique() == EXTENDED) {
+        (*ba)[0].ScaleAndRoundPOverQ(elementParams, cryptoParams->GetrInvModq());
+        (*ba)[1].ScaleAndRoundPOverQ(elementParams, cryptoParams->GetrInvModq());
+    }
+
+    (*ba)[0].SetFormat(Format::EVALUATION);
+    (*ba)[1].SetFormat(Format::EVALUATION);
+
+    ciphertext->SetElements({std::move((*ba)[0]), std::move((*ba)[1])});
+    ciphertext->SetNoiseScaleDeg(1);
+
+    return ciphertext;
+}
+
+// ============================================================
+// End of BFM+25 ThFHE encryption algorithm
+// ============================================================
+
 
 }  // namespace lbcrypto
