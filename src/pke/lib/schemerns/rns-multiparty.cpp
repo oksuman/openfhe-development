@@ -280,10 +280,6 @@ Ciphertext<DCRTPoly> MultipartyRNS::GenPartialDec(ConstCiphertext<DCRTPoly> ciph
         noise = std::move(e);
     }
 
-    // noise.SetFormat(Format::COEFFICIENT);
-    // PrintDCRTPoly(noise, "smudging noise");
-    // noise.SetFormat(Format::EVALUATION);
-
     auto params = cv[0].GetParams();
     DCRTPoly b;
 
@@ -333,14 +329,14 @@ Ciphertext<DCRTPoly> MultipartyRNS::GenPartialDec(ConstCiphertext<DCRTPoly> ciph
             const auto vecSize = params->GetParams().size();
             std::vector<NativeInteger> TwoPowL_mod(vecSize, NativeInteger(1));
 
-            // Precompute 2^{t-1} mod q_k per tower
+            // Precompute 2^{ceil{log_2 {t}}} mod q_k per tower
+            uint64_t exp = static_cast<uint64_t>(std::ceil(std::log2(static_cast<double>(t))));
             for (size_t k = 0; k < vecSize; ++k) {
                 auto modq_k = params->GetParams()[k]->GetModulus();
-                TwoPowL_mod[k] = NativeInteger(2).ModExp(NativeInteger(static_cast<uint64_t>(t-1)),
-                                                         modq_k);
+                TwoPowL_mod[k] = NativeInteger(2).ModExp(NativeInteger(exp), modq_k);
             }
 
-            // Multiply each tower of noise by 2^{t-1} mod q_k
+            // Multiply each tower of noise by 2^{ceil(log2(t))} mod q_k
             std::vector<NativePoly> noiseScaled;
             noiseScaled.reserve(noise.GetNumOfElements());
             for (usint k = 0; k < noise.GetNumOfElements(); ++k) {
@@ -354,7 +350,7 @@ Ciphertext<DCRTPoly> MultipartyRNS::GenPartialDec(ConstCiphertext<DCRTPoly> ciph
             DCRTPoly noiseScaledDCRT(noiseScaled);
             // PrintDCRTPoly(noiseScaledDCRT, "scaled error in partial decryption");
 
-            // Final partial: s*c1 + ns * (2^{t-1} * noise)
+            // Final partial: s*c1 + ns * (2^{ceil(log2(t))} * noise)
             b = s * cv[1] + ns * noiseScaledDCRT;
         }
         else if (shareType == "BFM+25") {
