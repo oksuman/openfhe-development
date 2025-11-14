@@ -324,8 +324,6 @@ Ciphertext<DCRTPoly> MultipartyRNS::GenPartialDec(ConstCiphertext<DCRTPoly> ciph
             b = s * cv[1] + ns * noiseScaledDCRT;
         }
         else if (shareType == "2adic") {
-            // Scale the noise by 2^{t-1} (t = number of participating shares)
-
             const auto vecSize = params->GetParams().size();
             std::vector<NativeInteger> TwoPowL_mod(vecSize, NativeInteger(1));
 
