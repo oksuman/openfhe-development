@@ -1783,6 +1783,32 @@ public:
         return out;
     }
 
+    /////////////////////////////////////
+    // Lazy Variants
+    /////////////////////////////////////
+
+    std::shared_ptr<std::map<usint, EvalKey<Element>>> EvalBootstrapLazyKeyGen(
+        const CryptoContextImpl<Element>& cc, const PrivateKey<Element> privateKey,
+        uint32_t slots) const {
+        if (!m_FHE) {
+            OPENFHE_THROW(not_available_error, "FHE module is not enabled for this scheme");
+        }
+        (void)cc;  // cc is not needed here but kept for symmetry with other APIs
+        return m_FHE->EvalBootstrapLazyKeyGen(privateKey, slots);
+    }
+
+    Ciphertext<Element> EvalBootstrapLazy(const CryptoContextImpl<Element>& cc,
+                                          ConstCiphertext<Element> ciphertext,
+                                          uint32_t numIterations,
+                                          uint32_t precision) const {
+        if (!m_FHE) {
+            OPENFHE_THROW(not_available_error, "FHE module is not enabled for this scheme");
+        }
+        (void)cc;  // cc is not needed here but kept for symmetry with other APIs
+        return m_FHE->EvalBootstrapLazy(ciphertext, numIterations, precision);
+    }
+
+
 protected:
     std::shared_ptr<ParameterGenerationBase<Element>> m_ParamsGen;
     std::shared_ptr<PKEBase<Element>> m_PKE;

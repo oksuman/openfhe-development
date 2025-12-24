@@ -184,8 +184,18 @@ public:
                                                                          const std::vector<uint32_t>& rotGroup,
                                                                          bool flag_i, double scale = 1,
                                                                          uint32_t L = 0) const;
+    std::vector<std::vector<ConstPlaintext>> EvalCoeffsToSlotsPrecomputeNoExt(const CryptoContextImpl<DCRTPoly>& cc,
+                                                                         const std::vector<std::complex<double>>& A,
+                                                                         const std::vector<uint32_t>& rotGroup,
+                                                                         bool flag_i, double scale = 1,
+                                                                         uint32_t L = 0) const;
 
     std::vector<std::vector<ConstPlaintext>> EvalSlotsToCoeffsPrecompute(const CryptoContextImpl<DCRTPoly>& cc,
+                                                                         const std::vector<std::complex<double>>& A,
+                                                                         const std::vector<uint32_t>& rotGroup,
+                                                                         bool flag_i, double scale = 1,
+                                                                         uint32_t L = 0) const;
+    std::vector<std::vector<ConstPlaintext>> EvalSlotsToCoeffsPrecomputeNoExt(const CryptoContextImpl<DCRTPoly>& cc,
                                                                          const std::vector<std::complex<double>>& A,
                                                                          const std::vector<uint32_t>& rotGroup,
                                                                          bool flag_i, double scale = 1,
@@ -231,6 +241,28 @@ public:
         return "FHECKKSRNS";
     }
 
+
+    /////////////////////////////////////
+    // Lazy Variants
+    /////////////////////////////////////
+    std::shared_ptr<std::map<usint, EvalKey<DCRTPoly>>> EvalBootstrapLazyKeyGen(
+        const PrivateKey<DCRTPoly> privateKey, uint32_t slots) override;
+
+    Ciphertext<DCRTPoly> EvalBootstrapLazy(ConstCiphertext<DCRTPoly> ciphertext,
+                                    uint32_t numIterations,
+                                    uint32_t precision) const override;
+
+    std::vector<int32_t> FindBootstrapRotationIndicesLazy(uint32_t slots, uint32_t M);
+
+    Ciphertext<DCRTPoly> EvalCoeffsToSlotsLazy(
+        const std::vector<std::vector<ConstPlaintext>>& A,
+        ConstCiphertext<DCRTPoly> ctxt) const;
+
+    Ciphertext<DCRTPoly> EvalSlotsToCoeffsLazy(
+        const std::vector<std::vector<ConstPlaintext>>& A,
+        ConstCiphertext<DCRTPoly> ctxt) const;
+
+
 private:
     //------------------------------------------------------------------------------
     // Auxiliary Bootstrap Functions
@@ -254,8 +286,11 @@ private:
     Ciphertext<DCRTPoly> EvalAddExt(ConstCiphertext<DCRTPoly> ciphertext1, ConstCiphertext<DCRTPoly> ciphertext2) const;
 
     EvalKey<DCRTPoly> ConjugateKeyGen(const PrivateKey<DCRTPoly> privateKey) const;
+    EvalKey<DCRTPoly> LazyConjugateKeyGen(const PrivateKey<DCRTPoly> privateKey) const;
 
     Ciphertext<DCRTPoly> Conjugate(ConstCiphertext<DCRTPoly> ciphertext,
+                                   const std::map<usint, EvalKey<DCRTPoly>>& evalKeys) const;
+    Ciphertext<DCRTPoly> LazyConjugate(ConstCiphertext<DCRTPoly> ciphertext,
                                    const std::map<usint, EvalKey<DCRTPoly>>& evalKeys) const;
 
     /**

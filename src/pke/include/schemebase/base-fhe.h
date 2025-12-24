@@ -383,6 +383,24 @@ public:
 
     template <class Archive>
     void load(Archive& ar) {}
+
+
+    /////////////////////////////////////
+    // Lazy Variants
+    /////////////////////////////////////
+
+    virtual std::shared_ptr<std::map<usint, EvalKey<Element>>> EvalBootstrapLazyKeyGen(
+        const PrivateKey<Element> privateKey, uint32_t slots) {
+        OPENFHE_THROW(not_implemented_error,
+                      "EvalBootstrapLazyKeyGen is not implemented for this scheme");
+    }
+
+    virtual Ciphertext<Element> EvalBootstrapLazy(ConstCiphertext<Element> ciphertext,
+                                                  uint32_t numIterations,
+                                                  uint32_t precision) const {
+        OPENFHE_THROW(not_implemented_error,
+                      "EvalBootstrapLazy is not implemented for this scheme");
+    }
 };
 
 }  // namespace lbcrypto

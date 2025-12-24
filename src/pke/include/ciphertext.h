@@ -67,16 +67,21 @@ public:
     /**
    * Default constructor
    */
-    CiphertextImpl() : CryptoObject<Element>() {}
+    CiphertextImpl() : CryptoObject<Element>() {
+        m_elementKeyIndices = { KEY_DEP_CONSTANT, KEY_DEP_S };
+    }
 
     /**
    * Construct a new ciphertext in the given context
    *
    * @param cc
    */
-    explicit CiphertextImpl(CryptoContext<Element> cc, const std::string& id = "",
+    explicit CiphertextImpl(CryptoContext<Element> cc,
+                            const std::string& id = "",
                             PlaintextEncodings encType = INVALID_ENCODING)
-        : CryptoObject<Element>(cc, id), encodingType(encType) {}
+        : CryptoObject<Element>(cc, id), encodingType(encType) {
+        m_elementKeyIndices = { KEY_DEP_CONSTANT, KEY_DEP_S };
+    }
 
     /**
    * Construct a new ciphertext from the parameters of a given public key
@@ -84,7 +89,10 @@ public:
    * @param k key whose CryptoObject parameters will get cloned
    */
     explicit CiphertextImpl(const std::shared_ptr<Key<Element>> k)
-        : CryptoObject<Element>(k->GetCryptoContext(), k->GetKeyTag()) {}
+        : CryptoObject<Element>(k->GetCryptoContext(), k->GetKeyTag()) {
+        m_elementKeyIndices = { KEY_DEP_CONSTANT, KEY_DEP_S };
+    }
+
 
     /**
    * Copy constructor

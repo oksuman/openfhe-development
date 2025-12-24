@@ -3732,6 +3732,41 @@ public:
     static uint32_t SerializedVersion() {
         return 1;
     }
+
+
+
+
+    /**
+     * Generates all lazy-rotation automorphism keys for EvalBootstrapLazy.
+     * Supported in CKKS only.
+     *
+     * @param privateKey private key.
+     * @param slots number of slots to support permutations on
+     */
+    void EvalBootstrapLazyKeyGen(const PrivateKey<Element> privateKey, uint32_t slots) {
+        ValidateKey(privateKey);
+
+        auto evalKeys = GetScheme()->EvalBootstrapLazyKeyGen(*this, privateKey, slots);
+
+        CryptoContextImpl<Element>::InsertEvalAutomorphismKey(evalKeys, privateKey->GetKeyTag());
+    }
+
+    /**
+     * Defines the lazy-rotation variant of bootstrapping evaluation of ciphertext
+     * using the same interface as EvalBootstrap.
+     *
+     * @param ciphertext the input ciphertext.
+     * @param numIterations number of iterations to run iterative bootstrapping (Meta-BTS).
+     * @param precision precision of initial bootstrapping algorithm.
+     * @return the refreshed ciphertext.
+     */
+    Ciphertext<Element> EvalBootstrapLazy(ConstCiphertext<Element> ciphertext,
+                                          uint32_t numIterations = 1,
+                                          uint32_t precision     = 0) const {
+        return GetScheme()->EvalBootstrapLazy(*this, ciphertext, numIterations, precision);
+    }
+
+
 };
 
 // Member function specializations. Their implementations are in cryptocontext.cpp

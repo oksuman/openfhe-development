@@ -545,54 +545,65 @@ template <class Element>
 Ciphertext<Element> LeveledSHEBase<Element>::EvalLazyAutomorphism(
     ConstCiphertext<Element> ciphertext, usint i,
     CALLER_INFO_ARGS_CPP) const {
- 
+
     const std::vector<Element>& cv = ciphertext->GetElements();
+    if (cv.empty()) {
+        OPENFHE_THROW("EvalLazyAutomorphism: ciphertext has no elements");
+    }
+
     usint N = cv[0].GetRingDimension();
 
     std::vector<usint> vec(N);
     PrecomputeAutoMap(N, i, &vec);
 
-    auto algo = ciphertext->GetCryptoContext()->GetScheme();
-
     Ciphertext<Element> result = ciphertext->Clone();
-    std::vector<Element>& rcv = result->GetElements();
+    std::vector<Element>& rcv  = result->GetElements();
 
     for (size_t idx = 0; idx < rcv.size(); ++idx) {
         rcv[idx] = rcv[idx].AutomorphismTransform(i, vec);
     }
     result->SetElements(rcv);
 
-    auto& keyIndices = result->GetElementKeyIndexVector();
-    const auto& originalKeyIndices = ciphertext->GetElementKeyIndexVector();
+    auto& keyIndicesRef = result->GetElementKeyIndexVector();
 
-    keyIndices.resize(rcv.size());
+    const auto& originalKeyIndicesRef = ciphertext->GetElementKeyIndexVector();
+    const std::vector<int32_t>* originalKeyIndicesPtr = &originalKeyIndicesRef;
+    std::vector<int32_t> originalKeyIndicesFallback;
 
-    // ---------- Key Dependency Update with ModMulFast ----------
+    if (originalKeyIndicesRef.empty()) {
+        // Treat as a fresh/standard ciphertext: [const, s, s, ...]
+        originalKeyIndicesFallback.assign(rcv.size(), CiphertextImpl<Element>::KEY_DEP_S);
+        if (!originalKeyIndicesFallback.empty()) {
+            originalKeyIndicesFallback[0] = CiphertextImpl<Element>::KEY_DEP_CONSTANT;
+        }
+        originalKeyIndicesPtr = &originalKeyIndicesFallback;
+    }
+    else if (originalKeyIndicesRef.size() != rcv.size()) {
+        OPENFHE_THROW("EvalLazyAutomorphism: mismatch between element vector size and key dependency vector size");
+    }
+
+    keyIndicesRef.resize(rcv.size());
+
     NativeInteger modulus(2 * N);
     NativeInteger mu = modulus.ComputeMu();
     NativeInteger iNative(i);
 
     for (size_t idx = 0; idx < rcv.size(); ++idx) {
-        int32_t oldDep = originalKeyIndices[idx];
-        // std::cout << "idx: " << idx << std::endl;
-        // std::cout << "oldDep: " << oldDep << std::endl;
-        
+        int32_t oldDep = (*originalKeyIndicesPtr)[idx];
+
         if (idx == 0 || oldDep == CiphertextImpl<Element>::KEY_DEP_CONSTANT) {
-            keyIndices[idx] = CiphertextImpl<Element>::KEY_DEP_CONSTANT;
+            keyIndicesRef[idx] = CiphertextImpl<Element>::KEY_DEP_CONSTANT;
         }
         else if (oldDep == CiphertextImpl<Element>::KEY_DEP_S) {
-            // s -> gᵢ(s)
-            keyIndices[idx] = i;
+            // s -> g_i(s)
+            keyIndicesRef[idx] = static_cast<int32_t>(i);
         }
         else {
             NativeInteger oldNative(oldDep);
             NativeInteger newDep = oldNative.ModMulFast(iNative, modulus, mu);
-            keyIndices[idx] = newDep.ConvertToInt();
+            keyIndicesRef[idx] = static_cast<int32_t>(newDep.ConvertToInt());
         }
-        // std::cout << "rotation index: " << i << std::endl;
-        // std::cout << "newDep: " << keyIndices[idx] << std::endl;
     }
-    // std::cout << "return" << std::endl; 
 
     return result;
 }
@@ -709,18 +720,28 @@ Ciphertext<Element> LeveledSHEBase<Element>::EvalLazyAtIndex(ConstCiphertext<Ele
 
 template <class Element>
 Ciphertext<Element> LeveledSHEBase<Element>::EvalBatchedKS(ConstCiphertext<Element> ciphertext) const {
-    // std::cout << "EvalBatchedKS called (lazy-aware)" << std::endl;
+    const auto& elementsRef = ciphertext->GetElements();
+    if (elementsRef.empty()) {
+        OPENFHE_THROW("EvalBatchedKS: ciphertext has no elements");
+    }
 
-    const auto& elements = ciphertext->GetElements();
-    const auto& keyIndices = ciphertext->GetElementKeyIndexVector();
+    const auto& keyIndicesRef = ciphertext->GetElementKeyIndexVector();
+    const std::vector<int32_t>* keyIndicesPtr = &keyIndicesRef;
+    std::vector<int32_t> keyIndicesFallback;
 
-    // std::cout << "key indices: " << keyIndices << std::endl;
-
-    if (elements.size() != keyIndices.size()) {
-        std::cout << "elements size: " << elements.size() << std::endl;
-        std::cout << "keyIndices size: " << keyIndices.size() << std::endl;
+    if (keyIndicesRef.empty()) {
+        // Treat as a standard ciphertext: [const, s, s, ...]
+        keyIndicesFallback.assign(elementsRef.size(), CiphertextImpl<Element>::KEY_DEP_S);
+        if (!keyIndicesFallback.empty()) {
+            keyIndicesFallback[0] = CiphertextImpl<Element>::KEY_DEP_CONSTANT;
+        }
+        keyIndicesPtr = &keyIndicesFallback;
+    }
+    else if (elementsRef.size() != keyIndicesRef.size()) {
         OPENFHE_THROW("EvalBatchedKS: mismatch between ciphertext elements and key index vector.");
     }
+
+    const auto& keyIndices = *keyIndicesPtr;
 
     const auto cc = ciphertext->GetCryptoContext();
     const auto& fullEvalKeyMap = cc->GetEvalAutomorphismKeyMap(ciphertext->GetKeyTag());
@@ -745,23 +766,22 @@ Ciphertext<Element> LeveledSHEBase<Element>::EvalBatchedKS(ConstCiphertext<Eleme
             if (foundCt0) {
                 OPENFHE_THROW("EvalBatchedKS: duplicate KEY_DEP_CONSTANT term detected");
             }
-            ct0 = elements[i];
+            ct0 = elementsRef[i];
             foundCt0 = true;
         }
         else if (dep == CiphertextImpl<Element>::KEY_DEP_S) {
             if (foundCt1) {
                 OPENFHE_THROW("EvalBatchedKS: duplicate KEY_DEP_S term detected");
             }
-            ct1 = elements[i];
+            ct1 = elementsRef[i];
             foundCt1 = true;
         }
         else {
-            auto ekIter = fullEvalKeyMap.find(dep);
+            auto ekIter = fullEvalKeyMap.find(static_cast<usint>(dep));
             if (ekIter == fullEvalKeyMap.end()) {
                 OPENFHE_THROW("EvalBatchedKS: EvalKey for automorphism index [" + std::to_string(dep) + "] not found.");
             }
-
-            cvToSwitch.push_back(elements[i]);
+            cvToSwitch.push_back(elementsRef[i]);
             evalKeyVec.push_back(ekIter->second);
         }
     }
@@ -786,6 +806,7 @@ Ciphertext<Element> LeveledSHEBase<Element>::EvalBatchedKS(ConstCiphertext<Eleme
 
     return result;
 }
+
 
 
 /////////////////////////////////////////
@@ -904,24 +925,49 @@ Ciphertext<Element> LeveledSHEBase<Element>::EvalLazyAddCore(ConstCiphertext<Ele
 
 template <class Element>
 void LeveledSHEBase<Element>::EvalLazyAddCoreInPlace(Ciphertext<Element>& ciphertext1,
-                                                      ConstCiphertext<Element> ciphertext2) const {
+                                                     ConstCiphertext<Element> ciphertext2) const {
     VerifyNumOfTowers(ciphertext1, ciphertext2);
 
     std::vector<Element>& cv1       = ciphertext1->GetElements();
     const std::vector<Element>& cv2 = ciphertext2->GetElements();
 
-    std::vector<int32_t>& keys1 = ciphertext1->GetElementKeyIndexVector();
-    const std::vector<int32_t>& keys2 = ciphertext2->GetElementKeyIndexVector();
+    std::vector<int32_t>& keys1Ref        = ciphertext1->GetElementKeyIndexVector();
+    const std::vector<int32_t>& keys2Ref  = ciphertext2->GetElementKeyIndexVector();
 
-    std::unordered_map<uint32_t, size_t> indexMap1;  // keyIndex → position in cv1
+    if (!keys1Ref.empty() && keys1Ref.size() != cv1.size()) {
+        OPENFHE_THROW("EvalLazyAddCoreInPlace: ciphertext1 key dependency vector size mismatch");
+    }
+    if (keys1Ref.empty()) {
+        keys1Ref.assign(cv1.size(), CiphertextImpl<Element>::KEY_DEP_S);
+        if (!keys1Ref.empty()) {
+            keys1Ref[0] = CiphertextImpl<Element>::KEY_DEP_CONSTANT;
+        }
+    }
 
-    for (size_t i = 0; i < keys1.size(); ++i){
-        indexMap1[keys1[i]] = i;
+    const std::vector<int32_t>* keys2Ptr = &keys2Ref;
+    std::vector<int32_t> keys2Fallback;
+
+    if (!keys2Ref.empty() && keys2Ref.size() != cv2.size()) {
+        OPENFHE_THROW("EvalLazyAddCoreInPlace: ciphertext2 key dependency vector size mismatch");
+    }
+    if (keys2Ref.empty()) {
+        keys2Fallback.assign(cv2.size(), CiphertextImpl<Element>::KEY_DEP_S);
+        if (!keys2Fallback.empty()) {
+            keys2Fallback[0] = CiphertextImpl<Element>::KEY_DEP_CONSTANT;
+        }
+        keys2Ptr = &keys2Fallback;
+    }
+
+    const auto& keys2 = *keys2Ptr;
+
+    std::unordered_map<uint32_t, size_t> indexMap1;
+    indexMap1.reserve(keys1Ref.size());
+    for (size_t i = 0; i < keys1Ref.size(); ++i) {
+        indexMap1[static_cast<uint32_t>(keys1Ref[i])] = i;
     }
 
     for (size_t i = 0; i < keys2.size(); ++i) {
-        uint32_t key = keys2[i];
-
+        uint32_t key = static_cast<uint32_t>(keys2[i]);
 
         auto it = indexMap1.find(key);
         if (it != indexMap1.end()) {
@@ -930,10 +976,12 @@ void LeveledSHEBase<Element>::EvalLazyAddCoreInPlace(Ciphertext<Element>& cipher
         }
         else {
             cv1.push_back(cv2[i]);
-            keys1.push_back(key);
+            keys1Ref.push_back(static_cast<int32_t>(key));
+            indexMap1[key] = cv1.size() - 1;
         }
     }
 }
+
 
 template <class Element>
 Ciphertext<Element> LeveledSHEBase<Element>::EvalSubCore(ConstCiphertext<Element> ciphertext1,
