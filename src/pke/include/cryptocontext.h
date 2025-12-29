@@ -250,10 +250,19 @@ class CryptoContextImpl : public Serializable {
     static std::shared_ptr<std::map<usint, EvalKey<Element>>> GetPartialEvalAutomorphismKeyMapPtr(
         const std::string& keyID, const std::vector<uint32_t>& indexList);
 
+    /**
+   * @brief Get lazy automorphism key map pointer for batched key switching
+   * @param keyID - secret key tag
+   * @return shared_ptr to std::map where the map key/data pair is index/automorphism key
+   */
+    static std::shared_ptr<std::map<usint, EvalKey<Element>>> GetEvalLazyAutomorphismKeyMapPtr(const std::string& keyID);
+
     // cached evalmult keys, by secret key UID
     static std::map<std::string, std::vector<EvalKey<Element>>> s_evalMultKeyMap;
     // cached evalautomorphism keys, by secret key UID
     static std::map<std::string, std::shared_ptr<std::map<usint, EvalKey<Element>>>> s_evalAutomorphismKeyMap;
+    // cached lazy evalautomorphism keys for batched key switching, by secret key UID
+    static std::map<std::string, std::shared_ptr<std::map<usint, EvalKey<Element>>>> s_evalLazyAutomorphismKeyMap;
 
 protected:
     // crypto parameters used for this context
@@ -923,6 +932,49 @@ public:
     }
 
     /**
+   * SerializeEvalLazyAutomorphismKey for lazy keys (batched key switching)
+   *
+   * @param ser - stream to serialize to
+   * @param sertype - type of serialization
+   * @param id - key to serialize; empty std::string means all keys
+   * @return true on success
+   */
+    template <typename ST>
+    static bool SerializeEvalLazyAutomorphismKey(std::ostream& ser, const ST& sertype, std::string id = "") {
+        std::map<std::string, std::shared_ptr<std::map<usint, EvalKey<Element>>>>* smap;
+        std::map<std::string, std::shared_ptr<std::map<usint, EvalKey<Element>>>> omap;
+        if (id.length() == 0) {
+            smap = &CryptoContextImpl<Element>::GetAllEvalLazyAutomorphismKeys();
+        }
+        else {
+            const auto keys = CryptoContextImpl<Element>::GetEvalLazyAutomorphismKeyMapPtr(id);
+            omap[id]        = keys;
+            smap            = &omap;
+        }
+        Serial::Serialize(*smap, ser, sertype);
+        return true;
+    }
+
+    /**
+   * DeserializeEvalLazyAutomorphismKey deserialize lazy keys for batched key switching
+   *
+   * @param ser - stream to serialize from
+   * @param sertype - type of serialization
+   * @return true on success
+   */
+    template <typename ST>
+    static bool DeserializeEvalLazyAutomorphismKey(std::istream& ser, const ST& sertype) {
+        std::map<std::string, std::shared_ptr<std::map<usint, EvalKey<Element>>>> keyMap;
+
+        Serial::Deserialize(keyMap, ser, sertype);
+
+        for (auto& k : keyMap) {
+            CryptoContextImpl<Element>::InsertEvalLazyAutomorphismKey(k.second, k.first);
+        }
+        return true;
+    }
+
+    /**
    * ClearEvalAutomorphismKeys - flush EvalAutomorphismKey cache
    */
     static void ClearEvalAutomorphismKeys();
@@ -948,6 +1000,25 @@ public:
     // TODO (dsuponit): move InsertEvalAutomorphismKey() to the private section of the class
     static void InsertEvalAutomorphismKey(const std::shared_ptr<std::map<usint, EvalKey<Element>>> evalKeyMap,
                                           const std::string& keyTag = "");
+
+    /**
+   * ClearEvalLazyAutomorphismKeys - flush lazy EvalAutomorphismKey cache for batched key switching
+   */
+    static void ClearEvalLazyAutomorphismKeys();
+
+    /**
+   * ClearEvalLazyAutomorphismKeys - flush lazy EvalAutomorphismKey cache for a given id
+   * @param id
+   */
+    static void ClearEvalLazyAutomorphismKeys(const std::string& id);
+
+    /**
+   * InsertEvalLazyAutomorphismKey - add the given map of lazy keys for batched key switching
+   * @param evalKeyMap
+   * @param keyTag
+   */
+    static void InsertEvalLazyAutomorphismKey(const std::shared_ptr<std::map<usint, EvalKey<Element>>> evalKeyMap,
+                                              const std::string& keyTag = "");
     //------------------------------------------------------------------------------
     // TURN FEATURES ON
     //------------------------------------------------------------------------------
@@ -1070,10 +1141,20 @@ public:
    */
     static std::map<std::string, std::shared_ptr<std::map<usint, EvalKey<Element>>>>& GetAllEvalAutomorphismKeys();
     /**
+   * Get a map of lazy automorphism keys for all secret keys (for batched key switching)
+   */
+    static std::map<std::string, std::shared_ptr<std::map<usint, EvalKey<Element>>>>& GetAllEvalLazyAutomorphismKeys();
+    /**
    * Get automorphism keys for a specific secret key tag
    */
     static std::map<usint, EvalKey<Element>>& GetEvalAutomorphismKeyMap(const std::string& keyID) {
         return *(CryptoContextImpl<Element>::GetEvalAutomorphismKeyMapPtr(keyID));
+    }
+    /**
+   * Get lazy automorphism keys for batched key switching for a specific secret key tag
+   */
+    static std::map<usint, EvalKey<Element>>& GetEvalLazyAutomorphismKeyMap(const std::string& keyID) {
+        return *(CryptoContextImpl<Element>::GetEvalLazyAutomorphismKeyMapPtr(keyID));
     }
     /**
    * Get a map of summation keys (each is composed of several automorphism keys) for all secret keys
@@ -3691,6 +3772,13 @@ public:
      * @return vector with all indices in the map. if nothing is found for the given keyTag, then the vector is empty
      **/
     static std::set<uint32_t> GetExistingEvalAutomorphismKeyIndices(const std::string& keyTag);
+
+    /**
+     * @brief GetExistingEvalLazyAutomorphismKeyIndices gets indices for all existing lazy automorphism keys
+     * @param keyTag map search id for the lazy automorphism keys
+     * @return vector with all indices in the map. if nothing is found for the given keyTag, then the vector is empty
+     **/
+    static std::set<uint32_t> GetExistingEvalLazyAutomorphismKeyIndices(const std::string& keyTag);
 
     /**
      * @brief GetUniqueValues compares 2 sets to generate a set with unique values from the 2nd set

@@ -324,9 +324,8 @@ void FHECKKSRNS::EvalBootstrapSetup(const CryptoContextImpl<DCRTPoly>& cc,
         (precom->m_paramsEnc[CKKS_BOOT_PARAMS::LEVEL_BUDGET] == 1) &&
         (precom->m_paramsDec[CKKS_BOOT_PARAMS::LEVEL_BUDGET] == 1);
 
-    if (isLTBootstrap && cryptoParams->GetKeySwitchTechnique() == BATCHED) {
-        OPENFHE_THROW("CKKS Lazy-Bootstrapping supports only FFT-based (isLTBootstrap=false) configuration.");
-    }
+    // Modified: Removed BATCHED restriction for isLTBootstrap
+    // Modified: Use same precompute functions for both HYBRID and BATCHED
 
     if (isLTBootstrap) {
         std::vector<std::vector<std::complex<double>>> U0(slots, std::vector<std::complex<double>>(slots));
@@ -353,18 +352,11 @@ void FHECKKSRNS::EvalBootstrapSetup(const CryptoContextImpl<DCRTPoly>& cc,
         }
     }
     else {
-        if (cryptoParams->GetKeySwitchTechnique() == BATCHED) {
-            precom->m_U0hatTPreFFT =
-                EvalCoeffsToSlotsPrecomputeNoExt(cc, ksiPows, rotGroup, false, scaleEnc, lEnc);
-            precom->m_U0PreFFT =
-                EvalSlotsToCoeffsPrecomputeNoExt(cc, ksiPows, rotGroup, false, scaleDec, lDec);
-        }
-        else {
-            precom->m_U0hatTPreFFT =
-                EvalCoeffsToSlotsPrecompute(cc, ksiPows, rotGroup, false, scaleEnc, lEnc);
-            precom->m_U0PreFFT =
-                EvalSlotsToCoeffsPrecompute(cc, ksiPows, rotGroup, false, scaleDec, lDec);
-        }
+        // Modified: Use same functions for both HYBRID and BATCHED
+        precom->m_U0hatTPreFFT =
+            EvalCoeffsToSlotsPrecompute(cc, ksiPows, rotGroup, false, scaleEnc, lEnc);
+        precom->m_U0PreFFT =
+            EvalSlotsToCoeffsPrecompute(cc, ksiPows, rotGroup, false, scaleDec, lDec);
     }
 }
 
@@ -374,8 +366,9 @@ std::shared_ptr<std::map<usint, EvalKey<DCRTPoly>>> FHECKKSRNS::EvalBootstrapKey
     const PrivateKey<DCRTPoly> privateKey, uint32_t slots) {
     const auto cryptoParams = std::dynamic_pointer_cast<CryptoParametersCKKSRNS>(privateKey->GetCryptoParameters());
 
-    if (cryptoParams->GetKeySwitchTechnique() != HYBRID)
-        OPENFHE_THROW("CKKS Bootstrapping is only supported for the Hybrid key switching method.");
+    // Modified: Allow both HYBRID and BATCHED key switching for bootstrapping
+    if (cryptoParams->GetKeySwitchTechnique() != HYBRID && cryptoParams->GetKeySwitchTechnique() != BATCHED)
+        OPENFHE_THROW("CKKS Bootstrapping is only supported for the Hybrid and BATCHED key switching methods.");
 #if NATIVEINT == 128 && !defined(__EMSCRIPTEN__)
     if (cryptoParams->GetScalingTechnique() == FLEXIBLEAUTO || cryptoParams->GetScalingTechnique() == FLEXIBLEAUTOEXT)
         OPENFHE_THROW("128-bit CKKS Bootstrapping is supported for FIXEDMANUAL and FIXEDAUTO methods only.");
@@ -398,8 +391,9 @@ std::shared_ptr<std::map<usint, EvalKey<DCRTPoly>>> FHECKKSRNS::EvalBootstrapKey
 void FHECKKSRNS::EvalBootstrapPrecompute(const CryptoContextImpl<DCRTPoly>& cc, uint32_t numSlots) {
     const auto cryptoParams = std::dynamic_pointer_cast<CryptoParametersCKKSRNS>(cc.GetCryptoParameters());
 
-    if (cryptoParams->GetKeySwitchTechnique() != HYBRID)
-        OPENFHE_THROW("CKKS Bootstrapping is only supported for the Hybrid key switching method.");
+    // Modified: Allow both HYBRID and BATCHED key switching for bootstrapping
+    if (cryptoParams->GetKeySwitchTechnique() != HYBRID && cryptoParams->GetKeySwitchTechnique() != BATCHED)
+        OPENFHE_THROW("CKKS Bootstrapping is only supported for the Hybrid and BATCHED key switching methods.");
 #if NATIVEINT == 128 && !defined(__EMSCRIPTEN__)
     if (cryptoParams->GetScalingTechnique() == FLEXIBLEAUTO || cryptoParams->GetScalingTechnique() == FLEXIBLEAUTOEXT)
         OPENFHE_THROW("128-bit CKKS Bootstrapping is supported for FIXEDMANUAL and FIXEDAUTO methods only.");
@@ -511,9 +505,9 @@ Ciphertext<DCRTPoly> FHECKKSRNS::EvalBootstrap(ConstCiphertext<DCRTPoly> ciphert
 
 
     TimeVar t;
-    double timeEncode(0.0);
-    double timeModReduce(0.0);
-    double timeDecode(0.0);
+    // double timeEncode(0.0);
+    // double timeModReduce(0.0);
+    // double timeDecode(0.0);
 // #ifdef BOOTSTRAPTIMING
 //     TimeVar t;
 //     double timeEncode(0.0);
@@ -654,8 +648,8 @@ Ciphertext<DCRTPoly> FHECKKSRNS::EvalBootstrap(ConstCiphertext<DCRTPoly> ciphert
     raised->SetElements(std::move(ctxtDCRT));
 
 
-    std::cerr << "\nNumber of levels at the beginning of bootstrapping: "
-              << raised->GetElements()[0].GetNumOfElements() - 1 << std::endl;
+    // std::cerr << "\nNumber of levels at the beginning of bootstrapping: "
+    //           << raised->GetElements()[0].GetNumOfElements() - 1 << std::endl;
 // #ifdef BOOTSTRAPTIMING
 //     std::cerr << "\nNumber of levels at the beginning of bootstrapping: "
 //               << raised->GetElements()[0].GetNumOfElements() - 1 << std::endl;
@@ -763,10 +757,10 @@ Ciphertext<DCRTPoly> FHECKKSRNS::EvalBootstrap(ConstCiphertext<DCRTPoly> ciphert
         algo->MultByIntegerInPlace(ctxtEnc, scalar);
 
 
-        timeModReduce = TOC(t);
-        std::cerr << "Approximate modular reduction time: " << timeModReduce / 1000.0 << " s" << std::endl;
+        // timeModReduce = TOC(t);
+        // std::cerr << "Approximate modular reduction time: " << timeModReduce / 1000.0 << " s" << std::endl;
         // Running SlotToCoeff
-        TIC(t);
+        // TIC(t);
 
 // #ifdef BOOTSTRAPTIMING
 //         timeModReduce = TOC(t);
@@ -836,13 +830,13 @@ Ciphertext<DCRTPoly> FHECKKSRNS::EvalBootstrap(ConstCiphertext<DCRTPoly> ciphert
         }
 
 
-        timeEncode = TOC(t);
+        // timeEncode = TOC(t);
 
-        std::cerr << "\nEncoding time: " << timeEncode / 1000.0 << " s" << std::endl;
+        // std::cerr << "\nEncoding time: " << timeEncode / 1000.0 << " s" << std::endl;
 
         // Running Approximate Mod Reduction
 
-        TIC(t);
+        // TIC(t);
 // #ifdef BOOTSTRAPTIMING
 //         timeEncode = TOC(t);
 
@@ -877,13 +871,13 @@ Ciphertext<DCRTPoly> FHECKKSRNS::EvalBootstrap(ConstCiphertext<DCRTPoly> ciphert
         // scale the message back up after Chebyshev interpolation
         algo->MultByIntegerInPlace(ctxtEnc, scalar);
 
-        timeModReduce = TOC(t);
+        // timeModReduce = TOC(t);
 
-        std::cerr << "Approximate modular reduction time: " << timeModReduce / 1000.0 << " s" << std::endl;
+        // std::cerr << "Approximate modular reduction time: " << timeModReduce / 1000.0 << " s" << std::endl;
 
         // Running SlotToCoeff
 
-        TIC(t);
+        // TIC(t);
 
 // #ifdef BOOTSTRAPTIMING
 //         timeModReduce = TOC(t);
@@ -918,9 +912,9 @@ Ciphertext<DCRTPoly> FHECKKSRNS::EvalBootstrap(ConstCiphertext<DCRTPoly> ciphert
     algo->MultByIntegerInPlace(ctxtDec, corFactor);
 #endif
 
-    timeDecode = TOC(t);
+    // timeDecode = TOC(t);
 
-    std::cout << "Decoding time: " << timeDecode / 1000.0 << " s" << std::endl;
+    // std::cout << "Decoding time: " << timeDecode / 1000.0 << " s" << std::endl;
 // #ifdef BOOTSTRAPTIMING
 //     timeDecode = TOC(t);
 

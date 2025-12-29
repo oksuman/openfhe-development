@@ -48,6 +48,9 @@ std::map<std::string, std::vector<EvalKey<Element>>> CryptoContextImpl<Element>:
 template <typename Element>
 std::map<std::string, std::shared_ptr<std::map<usint, EvalKey<Element>>>>
     CryptoContextImpl<Element>::s_evalAutomorphismKeyMap{};
+template <typename Element>
+std::map<std::string, std::shared_ptr<std::map<usint, EvalKey<Element>>>>
+    CryptoContextImpl<Element>::s_evalLazyAutomorphismKeyMap{};
 
 template <typename Element>
 void CryptoContextImpl<Element>::SetKSTechniqueInScheme() {
@@ -201,11 +204,27 @@ CryptoContextImpl<Element>::GetAllEvalAutomorphismKeys() {
 }
 
 template <typename Element>
+std::map<std::string, std::shared_ptr<std::map<usint, EvalKey<Element>>>>&
+CryptoContextImpl<Element>::GetAllEvalLazyAutomorphismKeys() {
+    return CryptoContextImpl<Element>::s_evalLazyAutomorphismKeyMap;
+}
+
+template <typename Element>
 std::shared_ptr<std::map<usint, EvalKey<Element>>> CryptoContextImpl<Element>::GetEvalAutomorphismKeyMapPtr(
     const std::string& keyID) {
     auto ekv = CryptoContextImpl<Element>::s_evalAutomorphismKeyMap.find(keyID);
     if (ekv == CryptoContextImpl<Element>::s_evalAutomorphismKeyMap.end()) {
         OPENFHE_THROW("EvalAutomorphismKeys are not generated for ID [" + keyID + "].");
+    }
+    return ekv->second;
+}
+
+template <typename Element>
+std::shared_ptr<std::map<usint, EvalKey<Element>>> CryptoContextImpl<Element>::GetEvalLazyAutomorphismKeyMapPtr(
+    const std::string& keyID) {
+    auto ekv = CryptoContextImpl<Element>::s_evalLazyAutomorphismKeyMap.find(keyID);
+    if (ekv == CryptoContextImpl<Element>::s_evalLazyAutomorphismKeyMap.end()) {
+        OPENFHE_THROW("EvalLazyAutomorphismKeys are not generated for ID [" + keyID + "].");
     }
     return ekv->second;
 }
@@ -287,7 +306,7 @@ void CryptoContextImpl<Element>::EvalLazyAtIndexKeyGen(const PrivateKey<Element>
     }
 
     auto evalKeys = GetScheme()->EvalLazyAtIndexKeyGen(publicKey, privateKey, indexList);
-    CryptoContextImpl<Element>::InsertEvalAutomorphismKey(evalKeys, privateKey->GetKeyTag());
+    CryptoContextImpl<Element>::InsertEvalLazyAutomorphismKey(evalKeys, privateKey->GetKeyTag());
 }
 
 template <typename Element>
@@ -322,6 +341,25 @@ void CryptoContextImpl<Element>::ClearEvalAutomorphismKeys(const CryptoContext<E
             ++it;
         }
     }
+}
+
+/**
+ * ClearEvalLazyAutomorphismKeys - flush lazy EvalAutomorphismKey cache
+ */
+template <typename Element>
+void CryptoContextImpl<Element>::ClearEvalLazyAutomorphismKeys() {
+    CryptoContextImpl<Element>::s_evalLazyAutomorphismKeyMap.clear();
+}
+
+/**
+ * ClearEvalLazyAutomorphismKeys - flush lazy EvalAutomorphismKey cache for a given id
+ * @param id
+ */
+template <typename Element>
+void CryptoContextImpl<Element>::ClearEvalLazyAutomorphismKeys(const std::string& id) {
+    auto kd = CryptoContextImpl<Element>::s_evalLazyAutomorphismKeyMap.find(id);
+    if (kd != CryptoContextImpl<Element>::s_evalLazyAutomorphismKeyMap.end())
+        CryptoContextImpl<Element>::s_evalLazyAutomorphismKeyMap.erase(kd);
 }
 
 template <typename Element>
@@ -377,6 +415,55 @@ void CryptoContextImpl<Element>::InsertEvalAutomorphismKey(
         // insert those new indices and their corresponding keys to the existing map
         std::set<uint32_t> indicesToInsert{CryptoContextImpl<Element>::GetUniqueValues(existingIndices, newIndices)};
         auto keyMapIt = CryptoContextImpl<Element>::s_evalAutomorphismKeyMap.find(id);
+        auto& keyMap  = *(keyMapIt->second);
+        for (uint32_t indx : indicesToInsert) {
+            keyMap[indx] = (*mapToInsert)[indx];
+        }
+    }
+}
+
+template <typename Element>
+std::set<uint32_t> CryptoContextImpl<Element>::GetExistingEvalLazyAutomorphismKeyIndices(const std::string& keyTag) {
+    auto keyMapIt = CryptoContextImpl<Element>::s_evalLazyAutomorphismKeyMap.find(keyTag);
+    if (keyMapIt == CryptoContextImpl<Element>::s_evalLazyAutomorphismKeyMap.end())
+        // there is no keys for the given id, return empty vector
+        return std::set<uint32_t>();
+
+    const auto& keyMap = *(keyMapIt->second);
+    std::set<uint32_t> indices;
+    for (const auto& [key, _] : keyMap) {
+        indices.insert(key);
+    }
+
+    return indices;
+}
+
+template <typename Element>
+void CryptoContextImpl<Element>::InsertEvalLazyAutomorphismKey(
+    const std::shared_ptr<std::map<uint32_t, EvalKey<Element>>> mapToInsert, const std::string& keyTag) {
+    // check if the map is empty
+    if (mapToInsert->empty()) {
+        return;
+    }
+
+    auto mapToInsertIt   = mapToInsert->begin();
+    const std::string id = (keyTag.empty()) ? mapToInsertIt->second->GetKeyTag() : keyTag;
+    std::set<uint32_t> existingIndices{CryptoContextImpl<Element>::GetExistingEvalLazyAutomorphismKeyIndices(id)};
+    if (existingIndices.empty()) {
+        // there is no keys for the given id, so we insert full mapToInsert
+        CryptoContextImpl<Element>::s_evalLazyAutomorphismKeyMap[id] = mapToInsert;
+    }
+    else {
+        // get all indices from mapToInsert
+        std::set<uint32_t> newIndices;
+        for (const auto& [key, _] : *mapToInsert) {
+            newIndices.insert(key);
+        }
+
+        // find all indices in mapToInsert that are not in the exising map and
+        // insert those new indices and their corresponding keys to the existing map
+        std::set<uint32_t> indicesToInsert{CryptoContextImpl<Element>::GetUniqueValues(existingIndices, newIndices)};
+        auto keyMapIt = CryptoContextImpl<Element>::s_evalLazyAutomorphismKeyMap.find(id);
         auto& keyMap  = *(keyMapIt->second);
         for (uint32_t indx : indicesToInsert) {
             keyMap[indx] = (*mapToInsert)[indx];

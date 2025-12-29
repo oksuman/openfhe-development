@@ -744,7 +744,7 @@ Ciphertext<Element> LeveledSHEBase<Element>::EvalBatchedKS(ConstCiphertext<Eleme
     const auto& keyIndices = *keyIndicesPtr;
 
     const auto cc = ciphertext->GetCryptoContext();
-    const auto& fullEvalKeyMap = cc->GetEvalAutomorphismKeyMap(ciphertext->GetKeyTag());
+    const auto& fullEvalKeyMap = cc->GetEvalLazyAutomorphismKeyMap(ciphertext->GetKeyTag());
     auto scheme = cc->GetScheme();
 
     std::vector<Element> partialElements;
