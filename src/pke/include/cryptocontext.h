@@ -2236,6 +2236,12 @@ public:
 
         return GetScheme()->EvalLazyAtIndex(ciphertext, index);
     }
+    
+    Ciphertext<Element> EvalDirectRotate(ConstCiphertext<Element> ciphertext, int32_t index) const {
+        ValidateCiphertext(ciphertext);
+        auto rotated = GetScheme()->EvalLazyAtIndex(ciphertext, index);
+        return GetScheme()->EvalBatchedKS(rotated);
+    }
 
     Ciphertext<Element> EvalBatchedKS(ConstCiphertext<Element> ciphertext) const {
         ValidateCiphertext(ciphertext);

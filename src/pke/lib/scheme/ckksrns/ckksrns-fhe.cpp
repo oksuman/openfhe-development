@@ -493,8 +493,8 @@ Ciphertext<DCRTPoly> FHECKKSRNS::EvalBootstrap(ConstCiphertext<DCRTPoly> ciphert
                                                uint32_t precision) const {
     const auto cryptoParams = std::dynamic_pointer_cast<CryptoParametersCKKSRNS>(ciphertext->GetCryptoParameters());
 
-    if (cryptoParams->GetKeySwitchTechnique() != HYBRID)
-        OPENFHE_THROW("CKKS Bootstrapping is only supported for the Hybrid key switching method.");
+    if (cryptoParams->GetKeySwitchTechnique() != HYBRID && cryptoParams->GetKeySwitchTechnique() != BATCHED)
+        OPENFHE_THROW("CKKS Bootstrapping is only supported for the Hybrid/Batched key switching method.");
 #if NATIVEINT == 128 && !defined(__EMSCRIPTEN__)
     if (cryptoParams->GetScalingTechnique() == FLEXIBLEAUTO || cryptoParams->GetScalingTechnique() == FLEXIBLEAUTOEXT)
         OPENFHE_THROW("128-bit CKKS Bootstrapping is supported for FIXEDMANUAL and FIXEDAUTO methods only.");
