@@ -34,6 +34,7 @@
 #include "key/evalkeyrelin.h"
 #include "cryptocontext.h"
 #include "schemerns/rns-pke.h"
+#include "thfhe-debug.h"
 
 #include <memory>
 #include <vector>
@@ -280,8 +281,17 @@ Ciphertext<DCRTPoly> MultipartyRNS::GenPartialDec(ConstCiphertext<DCRTPoly> ciph
         noise = std::move(e);
     }
 
+    // Debug output for raw noise
+    DebugPrintNorm("PartialDec: raw noise", noise);
+
     auto params = cv[0].GetParams();
     DCRTPoly b;
+
+    // Debug output for s*c1 term
+    {
+        DCRTPoly sc1 = s * cv[1];
+        DebugPrintNorm("PartialDec: s*c1", sc1);
+    }
 
     if (!denomClear) {
         std::cout << "no denominator clearing" << std::endl;
@@ -346,7 +356,12 @@ Ciphertext<DCRTPoly> MultipartyRNS::GenPartialDec(ConstCiphertext<DCRTPoly> ciph
                 noiseScaled.emplace_back(std::move(nk));
             }
             DCRTPoly noiseScaledDCRT(noiseScaled);
-            // PrintDCRTPoly(noiseScaledDCRT, "scaled error in partial decryption");
+
+            // Debug output for scaled noise
+            if (g_thfhe_debug) {
+                std::cout << "[DEBUG] PartialDec(2adic): scale = 2^" << exp << std::endl;
+            }
+            DebugPrintNorm("PartialDec: scaled noise (2adic)", noiseScaledDCRT);
 
             // Final partial: s*c1 + ns * (2^{ceil(log2(t))} * noise)
             b = s * cv[1] + ns * noiseScaledDCRT;
@@ -395,12 +410,12 @@ Ciphertext<DCRTPoly> MultipartyRNS::GenPartialDec(ConstCiphertext<DCRTPoly> ciph
         }
     }
 
+    // Debug output for final partial decryption
+    DebugPrintNorm("PartialDec: final result (s*c1 + noise)", b);
+
     auto result = ciphertext->CloneEmpty();
     result->SetElement(std::move(b));
 
-    // b.SetFormat(Format::COEFFICIENT);
-    // PrintDCRTPoly(b, "partial decryption");
-    // b.SetFormat(Format::EVALUATION);
     return result;
 }
 

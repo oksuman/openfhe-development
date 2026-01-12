@@ -40,6 +40,7 @@ BFV implementation. See https://eprint.iacr.org/2021/204 for details.
 #include "key/publickey.h"
 #include "scheme/bfvrns/bfvrns-cryptoparameters.h"
 #include "scheme/bfvrns/bfvrns-pke.h"
+#include "thfhe-debug.h"
 
 #include <random>
 
@@ -238,17 +239,22 @@ KeyPair<DCRTPoly> PKEBFVRNS::KeyGenInternalSpecial(CryptoContext<DCRTPoly> cc,
             break;
     }
 
-    DCRTPoly a(dug, paramsPK, Format::EVALUATION);
-    // DCRTPoly a(paramsPK, Format::EVALUATION, true);
+    // Debug mode: a=0 to isolate error terms
+    DCRTPoly a;
+    if (g_thfhe_zeroA) {
+        a = DCRTPoly(paramsPK, Format::EVALUATION, true);  // a = 0
+        if (g_thfhe_debug) std::cout << "[DEBUG] KeyGen: using a=0 mode\n";
+    } else {
+        a = DCRTPoly(dug, paramsPK, Format::EVALUATION);
+    }
     DCRTPoly e(dgg, paramsPK, Format::EVALUATION);
 
-    // e.SetFormat(Format::COEFFICIENT);
-    // PrintDCRTPoly(e, "error in key generation");
-    // e.SetFormat(Format::EVALUATION);
+    // Debug output for keygen error
+    DebugPrintNorm("KeyGen: raw error e", e);
 
     DCRTPoly eScaled;
     if (shareType == "2adic") {
-        auto scale2Pow = MakeScalePerTower_2PowT(paramsPK, static_cast<uint64_t>(Threshold-1));
+        auto scale2Pow = MakeScalePerTower_2PowT(paramsPK, static_cast<uint64_t>(Threshold));
         eScaled = ScaleNoisePerTower(e, paramsPK, scale2Pow);
         // PrintDCRTPoly(eScaled, "scaled error in key generation");
     }
@@ -308,14 +314,14 @@ KeyPair<DCRTPoly> PKEBFVRNS::KeyGenInternalSpecial(CryptoContext<DCRTPoly> cc,
         OPENFHE_THROW("SpecialKeyGen: unknown shareType = " + shareType);
     }
 
+    // Debug output for scaled error
+    DebugPrintNorm("KeyGen: scaled error", eScaled);
+
     // b = ns * eScaled - a * s
     DCRTPoly b(ns * eScaled - a * s);
-    // a.SetFormat(Format::COEFFICIENT);
-    // PrintDCRTPoly(a, "public key a in key generation");
-    // a.SetFormat(Format::EVALUATION);
-    // b.SetFormat(Format::COEFFICIENT);
-    // PrintDCRTPoly(b, "public key b in key generation");
-    // b.SetFormat(Format::EVALUATION);
+
+    // Debug output for public key
+    DebugPrintNorm("KeyGen: pk.b (ns*e - a*s)", b);
 
     usint sizeQ  = elementParams->GetParams().size();
     usint sizePK = paramsPK->GetParams().size();
