@@ -33,6 +33,7 @@
 #include "key/privatekey.h"
 #include "key/publickey.h"
 #include "cryptocontext.h"
+#include "thfhe-debug.h"
 
 namespace lbcrypto {
 
@@ -167,6 +168,15 @@ std::shared_ptr<std::vector<DCRTPoly>> PKERNS::EncryptZeroCore(const PublicKey<D
     DCRTPoly e0(dgg, elementParams, Format::EVALUATION);
     DCRTPoly e1(dgg, elementParams, Format::EVALUATION);
 
+    // Debug output for encryption randomness and errors
+    if (g_thfhe_debug) {
+        std::cout << "[DEBUG] Encrypt: randomness dist = "
+                  << (cryptoParams->GetSecretKeyDist() == GAUSSIAN ? "GAUSSIAN" : "TERNARY") << "\n";
+    }
+    DebugPrintNorm("Encrypt: randomness v", v);
+    DebugPrintNorm("Encrypt: error e0", e0);
+    DebugPrintNorm("Encrypt: error e1", e1);
+
     uint32_t sizeQ  = pk[0].GetParams()->GetParams().size();
     uint32_t sizeQl = elementParams->GetParams().size();
 
@@ -191,6 +201,10 @@ std::shared_ptr<std::vector<DCRTPoly>> PKERNS::EncryptZeroCore(const PublicKey<D
         c0 = p0 * v + ns * e0;
         c1 = p1 * v + ns * e1;
     }
+
+    // Debug output for ciphertext components
+    DebugPrintNorm("Encrypt: c0 = b*v + e0", c0);
+    DebugPrintNorm("Encrypt: c1 = a*v + e1", c1);
 
     return std::make_shared<std::vector<DCRTPoly>>(std::initializer_list<DCRTPoly>({std::move(c0), std::move(c1)}));
 }

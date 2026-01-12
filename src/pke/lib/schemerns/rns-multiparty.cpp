@@ -282,7 +282,7 @@ Ciphertext<DCRTPoly> MultipartyRNS::GenPartialDec(ConstCiphertext<DCRTPoly> ciph
     }
 
     // Debug output for raw noise
-    DebugPrintNorm("PartialDec: raw noise", noise);
+    DebugPrintNorm("PartialDec: smudging noise", noise);
 
     auto params = cv[0].GetParams();
     DCRTPoly b;
@@ -359,9 +359,9 @@ Ciphertext<DCRTPoly> MultipartyRNS::GenPartialDec(ConstCiphertext<DCRTPoly> ciph
 
             // Debug output for scaled noise
             if (g_thfhe_debug) {
-                std::cout << "[DEBUG] PartialDec(2adic): scale = 2^" << exp << std::endl;
+                std::cout << "[DEBUG] PartialDec(2adic): scale (2^log_2t)= 2^" << exp << std::endl;
             }
-            DebugPrintNorm("PartialDec: scaled noise (2adic)", noiseScaledDCRT);
+            DebugPrintNorm("PartialDec: Delta * Smudging noise (2adic)", noiseScaledDCRT);
 
             // Final partial: s*c1 + ns * (2^{ceil(log2(t))} * noise)
             b = s * cv[1] + ns * noiseScaledDCRT;
@@ -411,7 +411,7 @@ Ciphertext<DCRTPoly> MultipartyRNS::GenPartialDec(ConstCiphertext<DCRTPoly> ciph
     }
 
     // Debug output for final partial decryption
-    DebugPrintNorm("PartialDec: final result (s*c1 + noise)", b);
+    DebugPrintNorm("PartialDec: final result (s*c1 + Delta * e)", b);
 
     auto result = ciphertext->CloneEmpty();
     result->SetElement(std::move(b));
