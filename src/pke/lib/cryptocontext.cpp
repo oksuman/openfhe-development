@@ -935,16 +935,19 @@ DecryptResult CryptoContextImpl<DCRTPoly>::MultipartyDecryptFusionDistributed(
     // -------------------------
     else if (shareType == "2adic") {
         const uint64_t Lexp = static_cast<uint64_t>(threshold - 1);
-        const uint64_t two_n = 2ULL * static_cast<uint64_t>(Ndim);
+        const uint64_t two_n = 2ULL * static_cast<uint64_t>(Ndim); // 2n (n: ring dimension)
 
         uint64_t M = 1;
         while (M < static_cast<uint64_t>(N)) M <<= 1;
-        const uint64_t h = two_n / M;
+        const uint64_t h = two_n / M;  // ** Mh = 2n **
 
-        // α_j = ω^{cid_j - 1} = X^{h * (cid_j - 1)}
-        // Party cid_j (1-indexed) has evaluation point ω^{cid_j - 1}
+        // α_j = ω^{cid_j - 1} = X^{h * (cid_j - 1)}   ** ω is primitive M-th root of unity, cid = 1, ..., N
+        // Store monomial representation: α_j = sign_j * X^{r_j}
+        std::vector<uint64_t> alphaExps(L);      // r_j values
+        std::vector<bool> alphaSigns(L);          // true if negative (i.e., -X^r)
         std::vector<DCRTPoly> alphas;
         alphas.reserve(L);
+
         for (size_t j = 0; j < L; ++j) {
             const uint64_t cid   = static_cast<uint64_t>(client_indexes[j]);
             const uint64_t exp_j = cid - 1;  // ω exponent for party cid
@@ -952,6 +955,9 @@ DecryptResult CryptoContextImpl<DCRTPoly>::MultipartyDecryptFusionDistributed(
 
             const uint64_t r    = static_cast<uint64_t>(sigma % Ndim);
             const bool negWrap  = (static_cast<unsigned __int128>(sigma / Ndim) & 1) != 0;
+
+            alphaExps[j] = r;
+            alphaSigns[j] = negWrap;
 
             DCRTPoly alpha(elementParams, Format::COEFFICIENT, true);
             for (size_t k = 0; k < vecSize; ++k) {
@@ -964,73 +970,170 @@ DecryptResult CryptoContextImpl<DCRTPoly>::MultipartyDecryptFusionDistributed(
             alphas.emplace_back(std::move(alpha));
         }
 
+        // ============================================================
+        // OPTIMIZATION: Precompute total exponent sum and sign parity
+        // for numerator ∏_{i≠j}(-α_i) = ±X^{sum of exponents}
+        // ============================================================
+        // In ring Z[X]/(X^N+1): X^N = -1, so X^a * X^b = (-1)^{floor((a+b)/N)} * X^{(a+b) mod N}
+        // -α_i = -sign_i * X^{r_i} = (-1)^{sign_i+1} * X^{r_i}
+        // ∏_{i≠j}(-α_i) = ∏_{i≠j}[(-1)^{sign_i+1} * X^{r_i}]
+        //               = (-1)^{Σ_{i≠j}(sign_i+1)} * X^{Σ_{i≠j} r_i} (with wrapping)
+
+        unsigned __int128 totalExpSum = 0;
+        uint64_t totalSignFlips = 0;  // count of negative alphas
+        for (size_t i = 0; i < L; ++i) {
+            totalExpSum += alphaExps[i];
+            if (alphaSigns[i]) totalSignFlips++;
+        }
+
+        // Convert alphas to EVALUATION domain once (for denominator computation)
+        for (size_t i = 0; i < L; ++i) {
+            alphas[i].SetFormat(Format::EVALUATION);
+        }
+
+        // ============================================================
+        // PHASE 1: Compute all numerators and denominators
+        // ============================================================
+        std::vector<DCRTPoly> Numerators(L);
+        std::vector<DCRTPoly> Denominators(L);
+
+        for (size_t j = 0; j < L; ++j) {
+            // --- OPTIMIZED NUMERATOR: O(1) monomial construction ---
+            unsigned __int128 numExpTotal = totalExpSum - alphaExps[j];
+            uint64_t numExp = static_cast<uint64_t>(numExpTotal % Ndim);
+            uint64_t numWrapCount = static_cast<uint64_t>(numExpTotal / Ndim);
+            uint64_t signExponent = (L - 1) + (totalSignFlips - (alphaSigns[j] ? 1 : 0)) + numWrapCount;
+            bool numNegative = (signExponent & 1) != 0;
+
+            DCRTPoly NumeratorEval(elementParams, Format::COEFFICIENT, true);
+            for (size_t k = 0; k < vecSize; ++k) {
+                auto pk     = elementParams->GetParams()[k];
+                auto modq_k = pk->GetModulus();
+                NativePoly mono(pk, Format::COEFFICIENT, true);
+                mono[numExp] = numNegative ? (modq_k - 1) : NativeInteger(1);
+                NumeratorEval.SetElementAtIndex(k, std::move(mono));
+            }
+            NumeratorEval.SetFormat(Format::EVALUATION);
+            Numerators[j] = std::move(NumeratorEval);
+
+            // --- DENOMINATOR: ∏_{i≠j}(α_j - α_i) ---
+            DCRTPoly DenominatorEval(elementParams, Format::EVALUATION, true);
+            for (size_t k = 0; k < vecSize; ++k) {
+                auto pk = elementParams->GetParams()[k];
+                auto modq_k = pk->GetModulus();
+                NativePoly one(pk, Format::EVALUATION, true);
+                NativeVector oneVals(Ndim, modq_k);
+                for (usint s = 0; s < Ndim; ++s) oneVals[s] = NativeInteger(1);
+                one.SetValues(std::move(oneVals), Format::EVALUATION);
+                DenominatorEval.SetElementAtIndex(k, std::move(one));
+            }
+            for (size_t i = 0; i < L; ++i) {
+                if (i == j) continue;
+                DCRTPoly denom = alphas[j] - alphas[i];
+                DenominatorEval *= denom;
+            }
+            Denominators[j] = std::move(DenominatorEval);
+        }
+
+        // ============================================================
+        // PHASE 2: Batched inverse using Montgomery's trick
+        // Reduces L×N×K ModInverse calls to N×K calls
+        // ============================================================
+        std::vector<DCRTPoly> DenominatorInvs(L);
+
+        for (size_t k = 0; k < vecSize; ++k) {
+            auto pk     = elementParams->GetParams()[k];
+            auto modq_k = pk->GetModulus();
+            usint len   = Ndim;
+
+            // For each slot s, apply Montgomery's trick across all L denominators
+            // prefix[j][s] = ∏_{i=0}^{j} Denom[i][k][s]
+            std::vector<NativeVector> prefixVals(L, NativeVector(len, modq_k));
+
+            // Compute prefix products
+            auto& denom0_k = Denominators[0].GetElementAtIndex(k);
+            prefixVals[0] = denom0_k.GetValues();
+
+            for (size_t j = 1; j < L; ++j) {
+                auto& denomJ_k = Denominators[j].GetElementAtIndex(k);
+                auto denomVals = denomJ_k.GetValues();
+                for (usint s = 0; s < len; ++s) {
+                    prefixVals[j][s] = prefixVals[j-1][s].ModMul(denomVals[s], modq_k);
+                }
+            }
+
+            // Single batch of inverses: inv(prefix[L-1]) for each slot
+            NativeVector invAll(len, modq_k);
+            for (usint s = 0; s < len; ++s) {
+                invAll[s] = prefixVals[L-1][s].ModInverse(modq_k);
+            }
+
+            // Back-propagate to get individual inverses
+            // inv[j] = invAll * prefix[j-1] * suffix[j+1]
+            // Using iterative approach: curr = invAll, then multiply by denom[j] after extracting inv[j]
+            std::vector<NativeVector> invVals(L, NativeVector(len, modq_k));
+
+            // Compute suffix products (from right to left)
+            std::vector<NativeVector> suffixVals(L, NativeVector(len, modq_k));
+            for (usint s = 0; s < len; ++s) suffixVals[L-1][s] = NativeInteger(1);
+
+            for (int j = static_cast<int>(L) - 2; j >= 0; --j) {
+                auto& denomNext_k = Denominators[j+1].GetElementAtIndex(k);
+                auto denomNextVals = denomNext_k.GetValues();
+                for (usint s = 0; s < len; ++s) {
+                    suffixVals[j][s] = suffixVals[j+1][s].ModMul(denomNextVals[s], modq_k);
+                }
+            }
+
+            // inv[j] = invAll * prefix[j-1] * suffix[j+1]
+            // Special case: inv[0] = invAll * suffix[1]
+            for (usint s = 0; s < len; ++s) {
+                invVals[0][s] = invAll[s].ModMul(suffixVals[0][s], modq_k);
+            }
+            for (size_t j = 1; j < L; ++j) {
+                for (usint s = 0; s < len; ++s) {
+                    NativeInteger temp = invAll[s].ModMul(prefixVals[j-1][s], modq_k);
+                    invVals[j][s] = temp.ModMul(suffixVals[j][s], modq_k);
+                }
+            }
+
+            // Store results
+            for (size_t j = 0; j < L; ++j) {
+                if (DenominatorInvs[j].GetNumOfElements() == 0) {
+                    DenominatorInvs[j] = DCRTPoly(elementParams, Format::EVALUATION, true);
+                }
+                NativePoly invPoly(pk, Format::EVALUATION, true);
+                invPoly.SetValues(std::move(invVals[j]), Format::EVALUATION);
+                DenominatorInvs[j].SetElementAtIndex(k, std::move(invPoly));
+            }
+        }
+
+        // ============================================================
+        // PHASE 3: Compute L_j = Numerator * DenominatorInv (* Delta)
+        // ============================================================
         std::vector<DCRTPoly> Ljs;
         Ljs.reserve(L);
 
-        // L_j(0) = ∏_{i≠j} (0 - α_i) / (α_j - α_i) = ∏_{i≠j} (-α_i) / (α_j - α_i)
+        // Precompute Delta if denomClear (to avoid recomputing L times)
+        DCRTPoly Delta;
+        if (denomClear) {
+            Delta = DCRTPoly(elementParams, Format::COEFFICIENT, true);
+            for (size_t k = 0; k < vecSize; ++k) {
+                auto params_k = elementParams->GetParams()[k];
+                auto modq_k   = params_k->GetModulus();
+                NativeInteger pow2L = NativeInteger(2).ModExp(NativeInteger(Lexp), modq_k);
+                NativePoly poly(params_k, Format::COEFFICIENT, true);
+                poly[0] = pow2L;
+                Delta.SetElementAtIndex(k, std::move(poly));
+            }
+            Delta.SetFormat(Format::EVALUATION);
+        }
+
         for (size_t j = 0; j < L; ++j) {
-            DCRTPoly NumeratorEval(elementParams, Format::COEFFICIENT, true);
-            DCRTPoly DenominatorEval(elementParams, Format::COEFFICIENT, true);
-            for (size_t k = 0; k < vecSize; ++k) {
-                auto pk = elementParams->GetParams()[k];
-                NativePoly one(pk, Format::COEFFICIENT, true);
-                one[0] = NativeInteger(1);
-                NumeratorEval.SetElementAtIndex(k, one);
-                DenominatorEval.SetElementAtIndex(k, one);
-            }
-
-            for (size_t i = 0; i < L; ++i) {
-                if (i == j) continue;
-
-                // Build in COEFFICIENT
-                DCRTPoly negAlphaI = alphas[i].Negate();              // -α_i (numerator factor)
-                DCRTPoly denom     = alphas[j].Minus(alphas[i]);      // (α_j - α_i)
-
-                // Move to EVALUATION
-                negAlphaI.SetFormat(Format::EVALUATION);
-                denom.SetFormat(Format::EVALUATION);
-                NumeratorEval.SetFormat(Format::EVALUATION);
-                DenominatorEval.SetFormat(Format::EVALUATION);
-
-                NumeratorEval   *= negAlphaI;
-                DenominatorEval *= denom;
-            }
-
-            // Component-wise inverse of denominator
-            DCRTPoly DenInvEval(elementParams, Format::EVALUATION, true);
-            for (size_t k = 0; k < vecSize; ++k) {
-                auto& den_k  = DenominatorEval.GetElementAtIndex(k);
-                auto  vals   = den_k.GetValues();
-                auto  pk     = elementParams->GetParams()[k];
-                auto  modq_k = pk->GetModulus();
-                usint len    = vals.GetLength();
-
-                NativeVector invVals(len, modq_k);
-                for (usint s = 0; s < len; ++s)
-                    invVals[s] = vals[s].ModInverse(modq_k);
-
-                NativePoly invPoly(pk, Format::EVALUATION, true);
-                invPoly.SetValues(std::move(invVals), Format::EVALUATION);
-                DenInvEval.SetElementAtIndex(k, std::move(invPoly));
-            }
-
-            DCRTPoly Lj = NumeratorEval * DenInvEval;
-
+            DCRTPoly Lj = Numerators[j] * DenominatorInvs[j];
             if (denomClear) {
-                // Optional clearing factor Δ = 2^{t-1} per tower
-                DCRTPoly Delta(elementParams, Format::COEFFICIENT, true);
-                for (size_t k = 0; k < vecSize; ++k) {
-                    auto params_k = elementParams->GetParams()[k];
-                    auto modq_k   = params_k->GetModulus();
-                    NativeInteger pow2L = NativeInteger(2).ModExp(NativeInteger(Lexp), modq_k);
-                    NativePoly poly(params_k, Format::COEFFICIENT, true);
-                    poly[0] = pow2L;
-                    Delta.SetElementAtIndex(k, std::move(poly));
-                }
-                Delta.SetFormat(Format::EVALUATION);
                 Lj *= Delta;
             }
-
             Ljs.emplace_back(std::move(Lj));
         }
 
@@ -1065,6 +1168,9 @@ DecryptResult CryptoContextImpl<DCRTPoly>::MultipartyDecryptFusionDistributed(
         } else {
             fusedSum += c0;
         }
+
+        // Debug: norm of final fused result (c0 + sum of partials) - THIS is the meaningful noise measurement
+        DebugPrintNorm("FinalDec(2adic): c0 + sum(L_j * partial_j)", fusedSum);
 
         auto fusedCt = ciphertext->CloneEmpty();
         fusedCt->SetElement(std::move(fusedSum));

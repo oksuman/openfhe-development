@@ -108,7 +108,7 @@ static std::vector<NativeInteger> MakeScalePerTower_2PowT(
     const std::shared_ptr<ILDCRTParams<BigInteger>>& params, uint64_t T) {
     const size_t vecSize = params->GetParams().size();
     std::vector<NativeInteger> v(vecSize);
-    // Delta = 2^{ceil(log2(T))} for 2-adic secret sharing
+// Delta = 2^{ceil(log2(T))} for 2-adic secret sharing
     uint64_t exp = static_cast<uint64_t>(std::ceil(std::log2(static_cast<double>(T))));
     for (size_t k = 0; k < vecSize; ++k) {
         auto qk = params->GetParams()[k]->GetModulus();
@@ -228,27 +228,27 @@ KeyPair<DCRTPoly> PKEBFVRNS::KeyGenInternalSpecial(CryptoContext<DCRTPoly> cc,
 
     // ===== Secret key s =====
     DCRTPoly s;
-    usint ringDim = paramsPK->GetRingDimension();
+usint ringDim = paramsPK->GetRingDimension();
     switch (cryptoParams->GetSecretKeyDist()) {
         case GAUSSIAN:
             s = DCRTPoly(dgg, paramsPK, Format::EVALUATION);
-            if (g_thfhe_debug) std::cout << "[DEBUG] KeyGen: secret key dist = GAUSSIAN\n";
+if (g_thfhe_debug) std::cout << "[DEBUG] KeyGen: secret key dist = GAUSSIAN\n";
             break;
-        case UNIFORM_TERNARY: // default
+        case UNIFORM_TERNARY: // default 
             s = DCRTPoly(tug, paramsPK, Format::EVALUATION);
-            if (g_thfhe_debug) std::cout << "[DEBUG] KeyGen: secret key dist = UNIFORM_TERNARY (hw~2n/3=" << (2*ringDim/3) << ", n=" << ringDim << ")\n";
+if (g_thfhe_debug) std::cout << "[DEBUG] KeyGen: secret key dist = UNIFORM_TERNARY (hw~2n/3=" << (2*ringDim/3) << ", n=" << ringDim << ")\n";
             break;
         case SPARSE_TERNARY: {
             constexpr usint hw = 128;
             s = DCRTPoly(tug, paramsPK, Format::EVALUATION, hw);
-            if (g_thfhe_debug) std::cout << "[DEBUG] KeyGen: secret key dist = SPARSE_TERNARY (hw=" << hw << ", n=" << ringDim << ")\n";
+if (g_thfhe_debug) std::cout << "[DEBUG] KeyGen: secret key dist = SPARSE_TERNARY (hw=" << hw << ", n=" << ringDim << ")\n";
             break;
-        }
+}
         default:
-            if (g_thfhe_debug) std::cout << "[DEBUG] KeyGen: secret key dist = UNKNOWN\n";
+if (g_thfhe_debug) std::cout << "[DEBUG] KeyGen: secret key dist = UNKNOWN\n";
             break;
     }
-    // Debug output for secret key
+// Debug output for secret key
     DebugPrintNorm("KeyGen: secret key s", s);
     DebugPrintCoeffs("secret key s", s);
 
@@ -272,6 +272,7 @@ KeyPair<DCRTPoly> PKEBFVRNS::KeyGenInternalSpecial(CryptoContext<DCRTPoly> cc,
     if (shareType == "2adic") {
         auto scale2Pow = MakeScalePerTower_2PowT(paramsPK, static_cast<uint64_t>(Threshold));
         eScaled = ScaleNoisePerTower(e, paramsPK, scale2Pow);
+        // PrintDCRTPoly(eScaled, "scaled error in key generation");
     }
     else if (shareType == "shamir") {
         auto scaleFact4 = MakeScalePerTower_FactPow4(paramsPK, static_cast<uint32_t>(N));
@@ -334,7 +335,7 @@ KeyPair<DCRTPoly> PKEBFVRNS::KeyGenInternalSpecial(CryptoContext<DCRTPoly> cc,
 
     // b = ns * eScaled - a * s
     DCRTPoly b(ns * eScaled - a * s);
-
+    
     // Debug output for public key
     DebugPrintNorm("KeyGen: pk.b (ns*e - a*s)", b);
 
