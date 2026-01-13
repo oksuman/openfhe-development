@@ -334,37 +334,21 @@ Ciphertext<DCRTPoly> MultipartyRNS::GenPartialDec(ConstCiphertext<DCRTPoly> ciph
             b = s * cv[1] + ns * noiseScaledDCRT;
         }
         else if (shareType == "2adic") {
-            const auto vecSize = params->GetParams().size();
-            std::vector<NativeInteger> TwoPowL_mod(vecSize, NativeInteger(1));
-
-            // Precompute 2^{ceil{log_2 {t}}} mod q_k per tower
+            // Compute 2^{ceil(log2(t))} directly (t <= ~300, so 2^exp <= 512)
             uint64_t exp = static_cast<uint64_t>(std::ceil(std::log2(static_cast<double>(t))));
-            for (size_t k = 0; k < vecSize; ++k) {
-                auto modq_k = params->GetParams()[k]->GetModulus();
-                TwoPowL_mod[k] = NativeInteger(2).ModExp(NativeInteger(exp), modq_k);
-            }
+            int64_t twoPowL = static_cast<int64_t>(1ULL << exp);
 
-            // Multiply each tower of noise by 2^{ceil(log2(t))} mod q_k
-            std::vector<NativePoly> noiseScaled;
-            noiseScaled.reserve(noise.GetNumOfElements());
-            for (usint k = 0; k < noise.GetNumOfElements(); ++k) {
-                auto nk = noise.GetElementAtIndex(k);                 // EVALUATION domain
-                auto mk = params->GetParams()[k]->GetModulus();
-                const auto scale = TwoPowL_mod[k];
-                for (usint j = 0; j < nk.GetLength(); ++j)
-                    nk[j] = nk[j].ModMul(scale, mk);
-                noiseScaled.emplace_back(std::move(nk));
-            }
-            DCRTPoly noiseScaledDCRT(noiseScaled);
+            // Use DCRTPoly scalar multiplication (internally optimized)
+            DCRTPoly noiseScaled = noise.Times(twoPowL);
 
             // Debug output for scaled noise
             if (g_thfhe_debug) {
-                std::cout << "[DEBUG] PartialDec(2adic): scale (2^log_2t)= 2^" << exp << std::endl;
+                std::cout << "[DEBUG] PartialDec(2adic): scale = 2^" << exp << " = " << twoPowL << std::endl;
             }
-            DebugPrintNorm("PartialDec: Delta * Smudging noise (2adic)", noiseScaledDCRT);
+            DebugPrintNorm("PartialDec: Delta * Smudging noise (2adic)", noiseScaled);
 
             // Final partial: s*c1 + ns * (2^{ceil(log2(t))} * noise)
-            b = s * cv[1] + ns * noiseScaledDCRT;
+            b = s * cv[1] + ns * noiseScaled;
         }
         else if (shareType == "BFM+25") {
             const auto vecSize = params->GetParams().size();

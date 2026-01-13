@@ -967,6 +967,7 @@ DecryptResult CryptoContextImpl<DCRTPoly>::MultipartyDecryptFusionDistributed(
                 mono[r] = negWrap ? (modq_k - 1) : NativeInteger(1); // ±X^r
                 alpha.SetElementAtIndex(k, std::move(mono));
             }
+            alpha.SetFormat(Format::EVALUATION);
             alphas.emplace_back(std::move(alpha));
         }
 
@@ -977,7 +978,7 @@ DecryptResult CryptoContextImpl<DCRTPoly>::MultipartyDecryptFusionDistributed(
         // In ring Z[X]/(X^N+1): X^N = -1, so X^a * X^b = (-1)^{floor((a+b)/N)} * X^{(a+b) mod N}
         // -α_i = -sign_i * X^{r_i} = (-1)^{sign_i+1} * X^{r_i}
         // ∏_{i≠j}(-α_i) = ∏_{i≠j}[(-1)^{sign_i+1} * X^{r_i}]
-        //               = (-1)^{Σ_{i≠j}(sign_i+1)} * X^{Σ_{i≠j} r_i} (with wrapping)
+        //               = (-1)^{Σ_{i≠j}(sign_i+1)} * X^{Σ_{i≠j} r_i} 
 
         unsigned __int128 totalExpSum = 0;
         uint64_t totalSignFlips = 0;  // count of negative alphas
@@ -986,16 +987,22 @@ DecryptResult CryptoContextImpl<DCRTPoly>::MultipartyDecryptFusionDistributed(
             if (alphaSigns[i]) totalSignFlips++;
         }
 
-        // Convert alphas to EVALUATION domain once (for denominator computation)
-        for (size_t i = 0; i < L; ++i) {
-            alphas[i].SetFormat(Format::EVALUATION);
-        }
-
         // ============================================================
         // PHASE 1: Compute all numerators and denominators
         // ============================================================
         std::vector<DCRTPoly> Numerators(L);
         std::vector<DCRTPoly> Denominators(L);
+
+        // Precompute "1" poly in EVALUATION domain (reused for all Denominators)
+        DCRTPoly onePoly(elementParams, Format::EVALUATION, true);
+        for (size_t k = 0; k < vecSize; ++k) {
+            auto pk = elementParams->GetParams()[k];
+            auto modq_k = pk->GetModulus();
+            NativePoly one(pk, Format::EVALUATION, true);
+            NativeVector oneVals(Ndim, modq_k, NativeInteger(1));
+            one.SetValues(std::move(oneVals), Format::EVALUATION);
+            onePoly.SetElementAtIndex(k, std::move(one));
+        }
 
         for (size_t j = 0; j < L; ++j) {
             // --- OPTIMIZED NUMERATOR: O(1) monomial construction ---
@@ -1017,19 +1024,11 @@ DecryptResult CryptoContextImpl<DCRTPoly>::MultipartyDecryptFusionDistributed(
             Numerators[j] = std::move(NumeratorEval);
 
             // --- DENOMINATOR: ∏_{i≠j}(α_j - α_i) ---
-            DCRTPoly DenominatorEval(elementParams, Format::EVALUATION, true);
-            for (size_t k = 0; k < vecSize; ++k) {
-                auto pk = elementParams->GetParams()[k];
-                auto modq_k = pk->GetModulus();
-                NativePoly one(pk, Format::EVALUATION, true);
-                NativeVector oneVals(Ndim, modq_k);
-                for (usint s = 0; s < Ndim; ++s) oneVals[s] = NativeInteger(1);
-                one.SetValues(std::move(oneVals), Format::EVALUATION);
-                DenominatorEval.SetElementAtIndex(k, std::move(one));
-            }
+            DCRTPoly DenominatorEval = onePoly;
             for (size_t i = 0; i < L; ++i) {
                 if (i == j) continue;
-                DCRTPoly denom = alphas[j] - alphas[i];
+                DCRTPoly denom = alphas[j];
+                denom -= alphas[i];
                 DenominatorEval *= denom;
             }
             Denominators[j] = std::move(DenominatorEval);
@@ -1039,7 +1038,11 @@ DecryptResult CryptoContextImpl<DCRTPoly>::MultipartyDecryptFusionDistributed(
         // PHASE 2: Batched inverse using Montgomery's trick
         // Reduces L×N×K ModInverse calls to N×K calls
         // ============================================================
-        std::vector<DCRTPoly> DenominatorInvs(L);
+        std::vector<DCRTPoly> DenominatorInvs;
+        DenominatorInvs.reserve(L);
+        for (size_t j = 0; j < L; ++j) {
+            DenominatorInvs.emplace_back(elementParams, Format::EVALUATION, true);
+        }
 
         for (size_t k = 0; k < vecSize; ++k) {
             auto pk     = elementParams->GetParams()[k];
@@ -1050,13 +1053,12 @@ DecryptResult CryptoContextImpl<DCRTPoly>::MultipartyDecryptFusionDistributed(
             // prefix[j][s] = ∏_{i=0}^{j} Denom[i][k][s]
             std::vector<NativeVector> prefixVals(L, NativeVector(len, modq_k));
 
-            // Compute prefix products
             auto& denom0_k = Denominators[0].GetElementAtIndex(k);
             prefixVals[0] = denom0_k.GetValues();
 
             for (size_t j = 1; j < L; ++j) {
                 auto& denomJ_k = Denominators[j].GetElementAtIndex(k);
-                auto denomVals = denomJ_k.GetValues();
+                const auto& denomVals = denomJ_k.GetValues();
                 for (usint s = 0; s < len; ++s) {
                     prefixVals[j][s] = prefixVals[j-1][s].ModMul(denomVals[s], modq_k);
                 }
@@ -1068,40 +1070,36 @@ DecryptResult CryptoContextImpl<DCRTPoly>::MultipartyDecryptFusionDistributed(
                 invAll[s] = prefixVals[L-1][s].ModInverse(modq_k);
             }
 
-            // Back-propagate to get individual inverses
-            // inv[j] = invAll * prefix[j-1] * suffix[j+1]
-            // Using iterative approach: curr = invAll, then multiply by denom[j] after extracting inv[j]
             std::vector<NativeVector> invVals(L, NativeVector(len, modq_k));
 
-            // Compute suffix products (from right to left)
-            std::vector<NativeVector> suffixVals(L, NativeVector(len, modq_k));
-            for (usint s = 0; s < len; ++s) suffixVals[L-1][s] = NativeInteger(1);
-
-            for (int j = static_cast<int>(L) - 2; j >= 0; --j) {
-                auto& denomNext_k = Denominators[j+1].GetElementAtIndex(k);
-                auto denomNextVals = denomNext_k.GetValues();
+            if (L == 1) {
                 for (usint s = 0; s < len; ++s) {
-                    suffixVals[j][s] = suffixVals[j+1][s].ModMul(denomNextVals[s], modq_k);
+                    invVals[0][s] = NativeInteger(1);
                 }
-            }
-
-            // inv[j] = invAll * prefix[j-1] * suffix[j+1]
-            // Special case: inv[0] = invAll * suffix[1]
-            for (usint s = 0; s < len; ++s) {
-                invVals[0][s] = invAll[s].ModMul(suffixVals[0][s], modq_k);
-            }
-            for (size_t j = 1; j < L; ++j) {
+            } else {
+                NativeVector running(len, modq_k);
                 for (usint s = 0; s < len; ++s) {
-                    NativeInteger temp = invAll[s].ModMul(prefixVals[j-1][s], modq_k);
-                    invVals[j][s] = temp.ModMul(suffixVals[j][s], modq_k);
+                    running[s] = invAll[s];
+                }
+
+                for (int j = static_cast<int>(L) - 1; j >= 1; --j) {
+                    for (usint s = 0; s < len; ++s) {
+                        invVals[static_cast<size_t>(j)][s] =
+                            running[s].ModMul(prefixVals[static_cast<size_t>(j) - 1][s], modq_k);
+                    }
+                    const auto& denomVals = Denominators[static_cast<size_t>(j)].GetElementAtIndex(k).GetValues();
+                    for (usint s = 0; s < len; ++s) {
+                        running[s] = running[s].ModMul(denomVals[s], modq_k);
+                    }
+                }
+
+                for (usint s = 0; s < len; ++s) {
+                    invVals[0][s] = running[s];
                 }
             }
 
             // Store results
             for (size_t j = 0; j < L; ++j) {
-                if (DenominatorInvs[j].GetNumOfElements() == 0) {
-                    DenominatorInvs[j] = DCRTPoly(elementParams, Format::EVALUATION, true);
-                }
                 NativePoly invPoly(pk, Format::EVALUATION, true);
                 invPoly.SetValues(std::move(invVals[j]), Format::EVALUATION);
                 DenominatorInvs[j].SetElementAtIndex(k, std::move(invPoly));
@@ -1169,9 +1167,6 @@ DecryptResult CryptoContextImpl<DCRTPoly>::MultipartyDecryptFusionDistributed(
             fusedSum += c0;
         }
 
-        // Debug: norm of final fused result (c0 + sum of partials) - THIS is the meaningful noise measurement
-        DebugPrintNorm("FinalDec(2adic): c0 + sum(L_j * partial_j)", fusedSum);
-
         auto fusedCt = ciphertext->CloneEmpty();
         fusedCt->SetElement(std::move(fusedSum));
 
@@ -1209,7 +1204,6 @@ DecryptResult CryptoContextImpl<DCRTPoly>::MultipartyDecryptFusionDistributed(
         *plaintext = std::move(decrypted);
         return result;
     }
-
     // ===========================================
     // BFM+25: c0(+Δ) + Σ( L_j(0)(·Δ) · partial_j )
     // ===========================================
