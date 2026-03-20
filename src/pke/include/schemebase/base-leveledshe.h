@@ -653,6 +653,22 @@ public:
 
     virtual Ciphertext<Element> EvalBatchedKS(ConstCiphertext<Element> ciphertext) const;
 
+    /**
+     * Precompute digit decomposition for hoisted direct rotation.
+     * Decomposes c1 of the ciphertext for reuse across multiple EvalDirectRotate calls.
+     */
+    virtual std::shared_ptr<std::vector<Element>> EvalDirectRotatePrecompute(
+        ConstCiphertext<Element> ciphertext) const;
+
+    /**
+     * Hoisted direct rotation using precomputed digits.
+     * Applies automorphism to precomputed digits, then performs IP + ModDown using
+     * post-automorphism key structure.
+     */
+    virtual Ciphertext<Element> EvalDirectRotate(
+        ConstCiphertext<Element> ciphertext, int32_t index,
+        const std::shared_ptr<std::vector<Element>> digits) const;
+
     virtual usint FindAutomorphismIndex(usint index, usint m) const {
         OPENFHE_THROW("FindAutomorphismIndex is not supported for this scheme");
     }

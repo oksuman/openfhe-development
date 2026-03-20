@@ -2243,6 +2243,25 @@ public:
         return GetScheme()->EvalBatchedKS(rotated);
     }
 
+    /**
+     * Precompute digit decomposition for hoisted direct rotation.
+     */
+    std::shared_ptr<std::vector<Element>> EvalDirectRotatePrecompute(
+        ConstCiphertext<Element> ciphertext) const {
+        ValidateCiphertext(ciphertext);
+        return GetScheme()->EvalDirectRotatePrecompute(ciphertext);
+    }
+
+    /**
+     * Hoisted direct rotation using precomputed digits.
+     * Reuses digit decomposition across multiple rotations of the same ciphertext.
+     */
+    Ciphertext<Element> EvalDirectRotate(ConstCiphertext<Element> ciphertext, int32_t index,
+                                         const std::shared_ptr<std::vector<Element>> digits) const {
+        ValidateCiphertext(ciphertext);
+        return GetScheme()->EvalDirectRotate(ciphertext, index, digits);
+    }
+
     Ciphertext<Element> EvalBatchedKS(ConstCiphertext<Element> ciphertext) const {
         ValidateCiphertext(ciphertext);
    

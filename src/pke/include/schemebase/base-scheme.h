@@ -1037,6 +1037,23 @@ public:
         return m_LeveledSHE->EvalBatchedKS(ciphertext);
     }
 
+    virtual std::shared_ptr<std::vector<Element>> EvalDirectRotatePrecompute(
+        ConstCiphertext<Element> ciphertext) const {
+        VerifyLeveledSHEEnabled(__func__);
+        if (!ciphertext)
+            OPENFHE_THROW("Input ciphertext is nullptr");
+        return m_LeveledSHE->EvalDirectRotatePrecompute(ciphertext);
+    }
+
+    virtual Ciphertext<Element> EvalDirectRotate(
+        ConstCiphertext<Element> ciphertext, int32_t index,
+        const std::shared_ptr<std::vector<Element>> digits) const {
+        VerifyLeveledSHEEnabled(__func__);
+        if (!ciphertext)
+            OPENFHE_THROW("Input ciphertext is nullptr");
+        return m_LeveledSHE->EvalDirectRotate(ciphertext, index, digits);
+    }
+
     virtual uint32_t FindAutomorphismIndex(uint32_t index, uint32_t m) {
         VerifyLeveledSHEEnabled(__func__);
         return m_LeveledSHE->FindAutomorphismIndex(index, m);

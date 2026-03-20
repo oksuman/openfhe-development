@@ -809,6 +809,61 @@ Ciphertext<Element> LeveledSHEBase<Element>::EvalBatchedKS(ConstCiphertext<Eleme
 
 
 
+template <class Element>
+std::shared_ptr<std::vector<Element>> LeveledSHEBase<Element>::EvalDirectRotatePrecompute(
+    ConstCiphertext<Element> ciphertext) const {
+    const std::vector<Element>& cv = ciphertext->GetElements();
+    auto algo = ciphertext->GetCryptoContext()->GetScheme();
+    return algo->EvalKeySwitchPrecomputeCore(cv[1], ciphertext->GetCryptoParameters());
+}
+
+template <class Element>
+Ciphertext<Element> LeveledSHEBase<Element>::EvalDirectRotate(
+    ConstCiphertext<Element> ciphertext, int32_t index,
+    const std::shared_ptr<std::vector<Element>> digits) const {
+
+    if (index == 0) return ciphertext->Clone();
+
+    const auto cc = ciphertext->GetCryptoContext();
+    usint M = ciphertext->GetCryptoParameters()->GetElementParams()->GetCyclotomicOrder();
+    uint32_t autoIndex = FindAutomorphismIndex(index, M);
+
+    // Look up eval key from lazy (post-automorphism) key map
+    auto& evalKeyMap = cc->GetEvalLazyAutomorphismKeyMap(ciphertext->GetKeyTag());
+    auto ekIter = evalKeyMap.find(autoIndex);
+    if (ekIter == evalKeyMap.end())
+        OPENFHE_THROW("EvalDirectRotate (hoisted): key for autoIndex " + std::to_string(autoIndex) + " not found");
+    auto evalKey = ekIter->second;
+
+    // Apply automorphism to each precomputed digit
+    usint N = ciphertext->GetCryptoParameters()->GetElementParams()->GetRingDimension();
+    std::vector<usint> vec(N);
+    PrecomputeAutoMap(N, autoIndex, &vec);
+
+    auto autoDigits = std::make_shared<std::vector<Element>>(digits->size());
+    for (size_t j = 0; j < digits->size(); j++) {
+        (*autoDigits)[j] = (*digits)[j].AutomorphismTransform(autoIndex, vec);
+    }
+
+    // IP + ModDown
+    const auto& cv = ciphertext->GetElements();
+    auto paramsQl = cv[0].GetParams();
+    auto algo = cc->GetScheme();
+    auto ba = algo->EvalFastKeySwitchCore(autoDigits, evalKey, paramsQl);
+
+    // Add automorphism of c0
+    (*ba)[0] += cv[0].AutomorphismTransform(autoIndex, vec);
+
+    // Build result
+    Ciphertext<Element> result = ciphertext->CloneZero();
+    result->SetElements({std::move((*ba)[0]), std::move((*ba)[1])});
+    result->SetElementKeyIndexVector({
+        CiphertextImpl<Element>::KEY_DEP_CONSTANT,
+        CiphertextImpl<Element>::KEY_DEP_S
+    });
+    return result;
+}
+
 /////////////////////////////////////////
 // SHE LEVELED Mod Reduce
 /////////////////////////////////////////
