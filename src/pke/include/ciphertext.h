@@ -64,6 +64,7 @@ public:
     // 🔧 Key dependency constants
     static constexpr int32_t KEY_DEP_CONSTANT = 0;  // No secret key (e.g., constant term, s^0)
     static constexpr int32_t KEY_DEP_S        = 1;   // Directly tied to secret key s (s^1)
+    static constexpr int32_t KEY_DEP_S2       = 2;   // s^2 term (from ct×ct multiplication, before relinearization)
     /**
    * Default constructor
    */
@@ -100,6 +101,7 @@ public:
     CiphertextImpl(const CiphertextImpl<Element>& ciphertext) : CryptoObject<Element>(ciphertext) {
         m_elements         = ciphertext.m_elements;
         m_elementKeyIndices   = ciphertext.m_elementKeyIndices;  // 🔧 copy key index
+        m_elementExtended  = ciphertext.m_elementExtended;  // 🔧 copy extended flags
         m_noiseScaleDeg    = ciphertext.m_noiseScaleDeg;
         m_level            = ciphertext.m_level;
         m_hopslevel        = ciphertext.m_hopslevel;
@@ -113,6 +115,7 @@ public:
     explicit CiphertextImpl(Ciphertext<Element> ciphertext) : CryptoObject<Element>(*ciphertext) {
         m_elements         = ciphertext->m_elements;
         m_elementKeyIndices   = ciphertext->m_elementKeyIndices;  // 🔧 copy key index
+        m_elementExtended  = ciphertext->m_elementExtended;  // 🔧 copy extended flags
         m_noiseScaleDeg    = ciphertext->m_noiseScaleDeg;
         m_level            = ciphertext->m_level;
         m_hopslevel        = ciphertext->m_hopslevel;
@@ -129,6 +132,7 @@ public:
     CiphertextImpl(CiphertextImpl<Element>&& ciphertext) : CryptoObject<Element>(ciphertext) {
         m_elements         = std::move(ciphertext.m_elements);
         m_elementKeyIndices   = std::move(ciphertext.m_elementKeyIndices);  // 🔧 move key index map
+        m_elementExtended  = std::move(ciphertext.m_elementExtended);  // 🔧 move extended flags
         m_noiseScaleDeg    = std::move(ciphertext.m_noiseScaleDeg);
         m_level            = std::move(ciphertext.m_level);
         m_hopslevel        = std::move(ciphertext.m_hopslevel);
@@ -142,6 +146,7 @@ public:
     explicit CiphertextImpl(Ciphertext<Element>&& ciphertext) : CryptoObject<Element>(*ciphertext) {
         m_elements         = std::move(ciphertext->m_elements);
         m_elementKeyIndices   = std::move(ciphertext->m_elementKeyIndices);  // 🔧 move key index map
+        m_elementExtended  = std::move(ciphertext->m_elementExtended);  // 🔧 move extended flags
         m_noiseScaleDeg    = std::move(ciphertext->m_noiseScaleDeg);
         m_level            = std::move(ciphertext->m_level);
         m_hopslevel        = std::move(ciphertext->m_hopslevel);
@@ -201,6 +206,7 @@ public:
             CryptoObject<Element>::operator=(rhs);
             this->m_elements         = rhs.m_elements;
             this->m_elementKeyIndices= rhs.m_elementKeyIndices;  // 🔧 assign key index map
+            this->m_elementExtended  = rhs.m_elementExtended;  // 🔧 assign extended flags
             this->m_noiseScaleDeg    = rhs.m_noiseScaleDeg;
             this->m_level            = rhs.m_level;
             this->m_hopslevel        = rhs.m_hopslevel;
@@ -225,6 +231,7 @@ public:
             CryptoObject<Element>::operator=(std::move(rhs)); 
             this->m_elements         = std::move(rhs.m_elements);
             this->m_elementKeyIndices= std::move(rhs.m_elementKeyIndices);  // 🔧 move key index map
+            this->m_elementExtended  = std::move(rhs.m_elementExtended);  // 🔧 move extended flags
             this->m_noiseScaleDeg    = std::move(rhs.m_noiseScaleDeg);
             this->m_level            = std::move(rhs.m_level);
             this->m_hopslevel        = std::move(rhs.m_hopslevel);
@@ -478,6 +485,7 @@ public:
         Ciphertext<Element> cRes = this->CloneZero();
         cRes->SetElements(this->GetElements());
         cRes->SetElementKeyIndexVector(this->GetElementKeyIndexVector());
+        cRes->SetElementExtendedVector(this->GetElementExtendedVector());
 
         return cRes;
     }
@@ -583,7 +591,8 @@ public:
         ar(cereal::make_nvp("e", encodingType));
         ar(cereal::make_nvp("sl", m_slots));
         ar(cereal::make_nvp("m", m_metadataMap));
-        ar(cereal::make_nvp("ki", m_elementKeyIndices));  // 🔧 serialize key index 
+        ar(cereal::make_nvp("ki", m_elementKeyIndices));  // 🔧 serialize key index
+        ar(cereal::make_nvp("ext", m_elementExtended));  // 🔧 serialize extended flags
     }
 
     template <class Archive>
@@ -603,6 +612,7 @@ public:
         ar(cereal::make_nvp("sl", m_slots));
         ar(cereal::make_nvp("m", m_metadataMap));
         ar(cereal::make_nvp("ki", m_elementKeyIndices));  // 🔧 load key index map
+        ar(cereal::make_nvp("ext", m_elementExtended));  // 🔧 load extended flags
     }
 
     std::string SerializedObjectName() const {
@@ -657,11 +667,39 @@ public:
         m_elementKeyIndices[idx] = autoIndex;
     }
 
+    // 🔧 Extended basis (Q/PQ) tracking methods
+    const std::vector<bool>& GetElementExtendedVector() const {
+        return m_elementExtended;
+    }
+
+    std::vector<bool>& GetElementExtendedVector() {
+        return m_elementExtended;
+    }
+
+    void SetElementExtendedVector(const std::vector<bool>& v) {
+        m_elementExtended = v;
+    }
+
+    bool IsElementExtended(size_t idx) const {
+        if (m_elementExtended.empty() || idx >= m_elementExtended.size())
+            return false;  // default: Q basis
+        return m_elementExtended[idx];
+    }
+
+    void SetElementExtended(size_t idx, bool extended) {
+        if (m_elementExtended.size() <= idx)
+            m_elementExtended.resize(idx + 1, false);
+        m_elementExtended[idx] = extended;
+    }
+
 private:
     // vector of ring elements for this Ciphertext
     std::vector<Element> m_elements;
     // 🔧 New field: key index tracking per element (e.g., -1: constant, 1: s, i: gᵢ(s) for automorphism g)
     std::vector<int32_t> m_elementKeyIndices;
+    // 🔧 New field: per-element basis flag. true = PQ (extended) basis, false = Q basis.
+    // Empty vector means all elements are Q basis (default, backwards-compatible).
+    std::vector<bool> m_elementExtended;
 
     // the degree of the scaling factor for the encrypted message.
     uint32_t m_noiseScaleDeg = 1;

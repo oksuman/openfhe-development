@@ -34,6 +34,7 @@
 #include "key/privatekey.h"
 #include "cryptocontext.h"
 #include "schemebase/base-scheme.h"
+#include "schemerns/rns-cryptoparameters.h"
 
 namespace lbcrypto {
 
@@ -594,6 +595,10 @@ Ciphertext<Element> LeveledSHEBase<Element>::EvalLazyAutomorphism(
         if (idx == 0 || oldDep == CiphertextImpl<Element>::KEY_DEP_CONSTANT) {
             keyIndicesRef[idx] = CiphertextImpl<Element>::KEY_DEP_CONSTANT;
         }
+        else if (oldDep == CiphertextImpl<Element>::KEY_DEP_S2) {
+            OPENFHE_THROW("EvalLazyAutomorphism: ciphertext contains s^2 (KEY_DEP_S2) term. "
+                          "Automorphism on s^2 is not supported. Relinearize before applying rotation.");
+        }
         else if (oldDep == CiphertextImpl<Element>::KEY_DEP_S) {
             // s -> g_i(s)
             keyIndicesRef[idx] = static_cast<int32_t>(i);
@@ -698,11 +703,9 @@ template <class Element>
 Ciphertext<Element> LeveledSHEBase<Element>::EvalAtIndex(ConstCiphertext<Element> ciphertext, int32_t index,
                                                          const std::map<usint, EvalKey<Element>>& evalKeyMap) const {
     const auto cc = ciphertext->GetCryptoContext();
-    // std::cout << "EvalAtIndex called " << std::endl;
     usint M = ciphertext->GetCryptoParameters()->GetElementParams()->GetCyclotomicOrder();
 
     uint32_t autoIndex = FindAutomorphismIndex(index, M);
-    // std::cout << "autoIndex: " << autoIndex << std::endl; 
     return EvalAutomorphism(ciphertext, autoIndex, evalKeyMap);
 }
 
@@ -747,6 +750,9 @@ Ciphertext<Element> LeveledSHEBase<Element>::EvalBatchedKS(ConstCiphertext<Eleme
     const auto& fullEvalKeyMap = cc->GetEvalLazyAutomorphismKeyMap(ciphertext->GetKeyTag());
     auto scheme = cc->GetScheme();
 
+    // Get relin key for s^2 term if present
+    const auto& evalMultKeyVec = CryptoContextImpl<Element>::GetEvalMultKeyVector(ciphertext->GetKeyTag());
+
     std::vector<Element> partialElements;
     std::vector<int32_t> partialKeyDeps;
 
@@ -775,6 +781,15 @@ Ciphertext<Element> LeveledSHEBase<Element>::EvalBatchedKS(ConstCiphertext<Eleme
             }
             ct1 = elementsRef[i];
             foundCt1 = true;
+        }
+        else if (dep == CiphertextImpl<Element>::KEY_DEP_S2) {
+            // s^2 term: use relinearization key (s^2 → s)
+            if (evalMultKeyVec.empty()) {
+                OPENFHE_THROW("EvalBatchedKS: KEY_DEP_S2 term found but no relinearization key available. "
+                              "Call EvalMultKeyGen first.");
+            }
+            cvToSwitch.push_back(elementsRef[i]);
+            evalKeyVec.push_back(evalMultKeyVec[0]);
         }
         else {
             auto ekIter = fullEvalKeyMap.find(static_cast<usint>(dep));
@@ -861,6 +876,142 @@ Ciphertext<Element> LeveledSHEBase<Element>::EvalDirectRotate(
         CiphertextImpl<Element>::KEY_DEP_CONSTANT,
         CiphertextImpl<Element>::KEY_DEP_S
     });
+    return result;
+}
+
+template <class Element>
+Ciphertext<Element> LeveledSHEBase<Element>::EvalDirectRotateExt(
+    ConstCiphertext<Element> ciphertext, int32_t index) const {
+    auto digits = EvalDirectRotatePrecompute(ciphertext);
+    return EvalDirectRotateExt(ciphertext, index, digits);
+}
+
+template <class Element>
+Ciphertext<Element> LeveledSHEBase<Element>::EvalDirectRotateExt(
+    ConstCiphertext<Element> ciphertext, int32_t index,
+    const std::shared_ptr<std::vector<Element>> digits) const {
+
+    if (index == 0) {
+        // For identity rotation, just extend to QP via KeySwitchExt
+        const auto cc = ciphertext->GetCryptoContext();
+        return cc->KeySwitchExt(ciphertext, true);
+    }
+
+    const auto cc = ciphertext->GetCryptoContext();
+    const auto cryptoParams = std::dynamic_pointer_cast<CryptoParametersRNS>(ciphertext->GetCryptoParameters());
+    usint M = cryptoParams->GetElementParams()->GetCyclotomicOrder();
+    uint32_t autoIndex = FindAutomorphismIndex(index, M);
+
+    // Look up eval key from lazy (post-automorphism) key map
+    auto& evalKeyMap = cc->GetEvalLazyAutomorphismKeyMap(ciphertext->GetKeyTag());
+    auto ekIter = evalKeyMap.find(autoIndex);
+    if (ekIter == evalKeyMap.end())
+        OPENFHE_THROW("EvalDirectRotateExt: key for autoIndex " + std::to_string(autoIndex) + " not found");
+    auto evalKey = ekIter->second;
+
+    // Apply automorphism to each precomputed digit
+    usint N = cryptoParams->GetElementParams()->GetRingDimension();
+    std::vector<usint> vec(N);
+    PrecomputeAutoMap(N, autoIndex, &vec);
+
+    auto autoDigits = std::make_shared<std::vector<Element>>(digits->size());
+    for (size_t j = 0; j < digits->size(); j++) {
+        (*autoDigits)[j] = (*digits)[j].AutomorphismTransform(autoIndex, vec);
+    }
+
+    // IP without ModDown → PQ result
+    const auto& cv = ciphertext->GetElements();
+    auto paramsQl = cv[0].GetParams();
+    auto algo = cc->GetScheme();
+    auto cTilda = algo->EvalFastKeySwitchCoreExt(autoDigits, evalKey, paramsQl);
+
+    // Extend c0_auto from Q to QP: multiply by P, copy Q towers (P towers zero)
+    const auto paramsQlP = (*cTilda)[0].GetParams();
+    size_t sizeQl = paramsQl->GetParams().size();
+    Element c0_auto_PQ(paramsQlP, Format::EVALUATION, true);
+    auto cMult = cv[0].AutomorphismTransform(autoIndex, vec).TimesNoCheck(cryptoParams->GetPModq());
+    for (usint i = 0; i < sizeQl; i++) {
+        c0_auto_PQ.SetElementAtIndex(i, std::move(cMult.GetElementAtIndex(i)));
+    }
+
+    // Merge c0_auto_PQ + c0_ks (both are CONST term in PQ)
+    (*cTilda)[0] += c0_auto_PQ;
+
+    // Build result: 2-element PQ ciphertext
+    Ciphertext<Element> result = ciphertext->CloneZero();
+    result->SetElements({std::move((*cTilda)[0]), std::move((*cTilda)[1])});
+    result->SetElementKeyIndexVector({
+        CiphertextImpl<Element>::KEY_DEP_CONSTANT,
+        CiphertextImpl<Element>::KEY_DEP_S
+    });
+    result->SetElementExtendedVector({true, true});
+    return result;
+}
+
+template <class Element>
+Ciphertext<Element> LeveledSHEBase<Element>::EvalMultExt(
+    ConstCiphertext<Element> ciphertext, ConstPlaintext plaintext) const {
+    Ciphertext<Element> result = ciphertext->Clone();
+    EvalMultExtInPlace(result, plaintext);
+    return result;
+}
+
+template <class Element>
+void LeveledSHEBase<Element>::EvalMultExtInPlace(
+    Ciphertext<Element>& ciphertext, ConstPlaintext plaintext) const {
+    std::vector<Element>& cv = ciphertext->GetElements();
+
+    Element pt = plaintext->GetElement<Element>();
+    pt.SetFormat(Format::EVALUATION);
+
+    for (auto& c : cv) {
+        c *= pt;
+    }
+    ciphertext->SetNoiseScaleDeg(ciphertext->GetNoiseScaleDeg() + plaintext->GetNoiseScaleDeg());
+    ciphertext->SetScalingFactor(ciphertext->GetScalingFactor() * plaintext->GetScalingFactor());
+}
+
+template <class Element>
+Ciphertext<Element> LeveledSHEBase<Element>::EvalResolveModDown(
+    ConstCiphertext<Element> ciphertext) const {
+    const auto& cv = ciphertext->GetElements();
+    if (cv.empty()) {
+        OPENFHE_THROW("EvalResolveModDown: ciphertext has no elements");
+    }
+
+    const auto cryptoParams = std::dynamic_pointer_cast<CryptoParametersRNS>(ciphertext->GetCryptoParameters());
+    const auto paramsP = cryptoParams->GetParamsP();
+    const auto paramsQlP = cv[0].GetParams();
+
+    // Compute Q params from QP params
+    usint sizeQl = paramsQlP->GetParams().size() - paramsP->GetParams().size();
+    std::vector<NativeInteger> moduliQ(sizeQl);
+    std::vector<NativeInteger> rootsQ(sizeQl);
+    for (size_t i = 0; i < sizeQl; i++) {
+        moduliQ[i] = paramsQlP->GetParams()[i]->GetModulus();
+        rootsQ[i]  = paramsQlP->GetParams()[i]->GetRootOfUnity();
+    }
+    auto paramsQl = std::make_shared<typename Element::Params>(
+        2 * paramsQlP->GetRingDimension(), moduliQ, rootsQ);
+
+    PlaintextModulus t = (cryptoParams->GetNoiseScale() == 1) ? 0 : cryptoParams->GetPlaintextModulus();
+
+    // ApproxModDown each element from QP to Q
+    std::vector<Element> resultElements(cv.size());
+    for (size_t i = 0; i < cv.size(); i++) {
+        resultElements[i] = cv[i].ApproxModDown(
+            paramsQl, cryptoParams->GetParamsP(),
+            cryptoParams->GetPInvModq(), cryptoParams->GetPInvModqPrecon(),
+            cryptoParams->GetPHatInvModp(), cryptoParams->GetPHatInvModpPrecon(),
+            cryptoParams->GetPHatModq(), cryptoParams->GetModqBarrettMu(),
+            cryptoParams->GettInvModp(), cryptoParams->GettInvModpPrecon(),
+            t, cryptoParams->GettModqPrecon());
+    }
+
+    Ciphertext<Element> result = ciphertext->CloneZero();
+    result->SetElements(std::move(resultElements));
+    result->SetElementKeyIndexVector(ciphertext->GetElementKeyIndexVector());
+    result->SetElementExtendedVector({});  // all Q now
     return result;
 }
 

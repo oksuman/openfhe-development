@@ -2264,8 +2264,47 @@ public:
 
     Ciphertext<Element> EvalBatchedKS(ConstCiphertext<Element> ciphertext) const {
         ValidateCiphertext(ciphertext);
-   
+
         return GetScheme()->EvalBatchedKS(ciphertext);
+    }
+
+    /**
+     * Direct rotation returning all-PQ ciphertext (deferred ModDown).
+     * Non-hoisted: decomposes internally per call.
+     */
+    Ciphertext<Element> EvalDirectRotateExt(ConstCiphertext<Element> ciphertext, int32_t index) const {
+        ValidateCiphertext(ciphertext);
+        return GetScheme()->EvalDirectRotateExt(ciphertext, index);
+    }
+
+    /**
+     * Hoisted overload: uses precomputed digit decomposition.
+     */
+    Ciphertext<Element> EvalDirectRotateExt(ConstCiphertext<Element> ciphertext, int32_t index,
+                                            const std::shared_ptr<std::vector<Element>> digits) const {
+        ValidateCiphertext(ciphertext);
+        return GetScheme()->EvalDirectRotateExt(ciphertext, index, digits);
+    }
+
+    /**
+     * Plaintext multiply for PQ-basis ciphertext. Plaintext must be in PQ basis.
+     */
+    Ciphertext<Element> EvalMultExt(ConstCiphertext<Element> ciphertext, ConstPlaintext plaintext) const {
+        ValidateCiphertext(ciphertext);
+        return GetScheme()->EvalMultExt(ciphertext, plaintext);
+    }
+
+    void EvalMultExtInPlace(Ciphertext<Element>& ciphertext, ConstPlaintext plaintext) const {
+        ValidateCiphertext(ciphertext);
+        GetScheme()->EvalMultExtInPlace(ciphertext, plaintext);
+    }
+
+    /**
+     * Apply ModDown to all-PQ ciphertext → Q basis. Delegates to KeySwitchDown.
+     */
+    Ciphertext<Element> EvalResolveModDown(ConstCiphertext<Element> ciphertext) const {
+        ValidateCiphertext(ciphertext);
+        return GetScheme()->EvalResolveModDown(ciphertext);
     }
 
     /**

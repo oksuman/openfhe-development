@@ -669,6 +669,40 @@ public:
         ConstCiphertext<Element> ciphertext, int32_t index,
         const std::shared_ptr<std::vector<Element>> digits) const;
 
+    /**
+     * Direct rotation returning all-PQ ciphertext (deferred ModDown).
+     * c0_auto is extended Q→PQ and merged with c0_ks. c1_ks stays in PQ.
+     * Returns 2-element PQ ciphertext: [c0(PQ,CONST), c1(PQ,S)].
+     * Non-hoisted overload: decomposes internally (no precomputation reuse).
+     */
+    virtual Ciphertext<Element> EvalDirectRotateExt(
+        ConstCiphertext<Element> ciphertext, int32_t index) const;
+
+    /**
+     * Hoisted overload: uses precomputed digit decomposition.
+     */
+    virtual Ciphertext<Element> EvalDirectRotateExt(
+        ConstCiphertext<Element> ciphertext, int32_t index,
+        const std::shared_ptr<std::vector<Element>> digits) const;
+
+    /**
+     * Plaintext multiply for PQ-basis ciphertext (mod PQ version of EvalMult).
+     * All ct elements must be in PQ basis. Plaintext must also be encoded in PQ basis
+     * (use MakeQPPlaintext or equivalent). Each ct element is multiplied by pt.
+     */
+    virtual Ciphertext<Element> EvalMultExt(
+        ConstCiphertext<Element> ciphertext, ConstPlaintext plaintext) const;
+
+    virtual void EvalMultExtInPlace(
+        Ciphertext<Element>& ciphertext, ConstPlaintext plaintext) const;
+
+    /**
+     * Apply ModDown to all-PQ ciphertext, converting to Q basis.
+     * Wrapper around KeySwitchDown for PQ→Q conversion.
+     */
+    virtual Ciphertext<Element> EvalResolveModDown(
+        ConstCiphertext<Element> ciphertext) const;
+
     virtual usint FindAutomorphismIndex(usint index, usint m) const {
         OPENFHE_THROW("FindAutomorphismIndex is not supported for this scheme");
     }

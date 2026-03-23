@@ -1054,6 +1054,47 @@ public:
         return m_LeveledSHE->EvalDirectRotate(ciphertext, index, digits);
     }
 
+    virtual Ciphertext<Element> EvalDirectRotateExt(
+        ConstCiphertext<Element> ciphertext, int32_t index) const {
+        VerifyLeveledSHEEnabled(__func__);
+        if (!ciphertext)
+            OPENFHE_THROW("Input ciphertext is nullptr");
+        return m_LeveledSHE->EvalDirectRotateExt(ciphertext, index);
+    }
+
+    virtual Ciphertext<Element> EvalDirectRotateExt(
+        ConstCiphertext<Element> ciphertext, int32_t index,
+        const std::shared_ptr<std::vector<Element>> digits) const {
+        VerifyLeveledSHEEnabled(__func__);
+        if (!ciphertext)
+            OPENFHE_THROW("Input ciphertext is nullptr");
+        return m_LeveledSHE->EvalDirectRotateExt(ciphertext, index, digits);
+    }
+
+    Ciphertext<Element> EvalMultExt(
+        ConstCiphertext<Element> ciphertext, ConstPlaintext plaintext) const {
+        VerifyLeveledSHEEnabled(__func__);
+        if (!ciphertext)
+            OPENFHE_THROW("Input ciphertext is nullptr");
+        return m_LeveledSHE->EvalMultExt(ciphertext, plaintext);
+    }
+
+    void EvalMultExtInPlace(
+        Ciphertext<Element>& ciphertext, ConstPlaintext plaintext) const {
+        VerifyLeveledSHEEnabled(__func__);
+        if (!ciphertext)
+            OPENFHE_THROW("Input ciphertext is nullptr");
+        m_LeveledSHE->EvalMultExtInPlace(ciphertext, plaintext);
+    }
+
+    Ciphertext<Element> EvalResolveModDown(
+        ConstCiphertext<Element> ciphertext) const {
+        VerifyLeveledSHEEnabled(__func__);
+        if (!ciphertext)
+            OPENFHE_THROW("Input ciphertext is nullptr");
+        return m_LeveledSHE->EvalResolveModDown(ciphertext);
+    }
+
     virtual uint32_t FindAutomorphismIndex(uint32_t index, uint32_t m) {
         VerifyLeveledSHEEnabled(__func__);
         return m_LeveledSHE->FindAutomorphismIndex(index, m);
