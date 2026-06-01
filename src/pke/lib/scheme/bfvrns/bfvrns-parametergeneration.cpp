@@ -120,7 +120,7 @@ bool ParameterGenerationBFVRNS::ParamsGenBFVRNS(std::shared_ptr<CryptoParameters
             if (multipartyMode == NOISE_FLOODING_MULTIPARTY)
                 logq += cryptoParamsBFVRNS->EstimateMultipartyFloodingLogQ();
             // adds logP in the case of HYBRID key switching
-            if (ksTech == HYBRID) {
+            if (ksTech == HYBRID || ksTech == BATCHED) {
                 // number of RNS limbs
                 uint32_t k = static_cast<uint32_t>(std::ceil(std::ceil(logq) / dcrtBits));
                 // set the number of digits
@@ -134,7 +134,7 @@ bool ParameterGenerationBFVRNS::ParamsGenBFVRNS(std::shared_ptr<CryptoParameters
     };
 
     auto noiseKS = [&](uint32_t n, double logqPrev, double w, bool mult) -> double {
-        if (ksTech == HYBRID) {
+        if (ksTech == HYBRID || ksTech == BATCHED) {
             // conservative estimate for HYBRID to avoid the use of method of
             // iterative approximations; we do not know the number
             // of digits and moduli at this point and use upper bounds
@@ -376,7 +376,7 @@ bool ParameterGenerationBFVRNS::ParamsGenBFVRNS(std::shared_ptr<CryptoParameters
     // Validate the ring dimension found using estimated logQ(P) against actual logQ(P)
     if (stdLevel != HEStd_NotSet) {
         uint32_t logActualQ = 0;
-        if (ksTech == HYBRID) {
+        if (ksTech == HYBRID || ksTech == BATCHED) {
             logActualQ = cryptoParamsBFVRNS->GetParamsQP()->GetModulus().GetMSB();
         }
         else {

@@ -59,7 +59,7 @@ void CryptoParametersBGVRNS::PrecomputeCRTTables(KeySwitchTechnique ksTech, Scal
 
     NativeInteger t(GetPlaintextModulus());
 
-    if (m_ksTechnique == HYBRID) {
+    if (m_ksTechnique == HYBRID || m_ksTechnique == BATCHED) {
         size_t sizeP = GetParamsP()->GetParams().size();
         std::vector<NativeInteger> moduliP(sizeP);
         for (size_t j = 0; j < sizeP; j++) {
@@ -135,7 +135,7 @@ void CryptoParametersBGVRNS::PrecomputeCRTTables(KeySwitchTechnique ksTech, Scal
         }
     }
 
-    if (m_ksTechnique == HYBRID) {
+    if (m_ksTechnique == HYBRID || m_ksTechnique == BATCHED) {
         const auto BarrettBase128Bit(BigInteger(1).LShiftEq(128));
         m_modqBarrettMu.resize(sizeQ);
         for (uint32_t i = 0; i < sizeQ; i++) {

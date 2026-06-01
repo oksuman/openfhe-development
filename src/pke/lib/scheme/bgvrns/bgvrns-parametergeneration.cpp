@@ -324,7 +324,7 @@ void ParameterGenerationBGVRNS::InitializeFloodingDgg(
                 OPENFHE_THROW("Digit size value cannot be 0 for BV keyswitching");
             }
         }
-        else if (ksTech == HYBRID) {
+        else if (ksTech == HYBRID || ksTech == BATCHED) {
             if (r == 0) {
                 // 2*freshEncryptionNoise is done because after modulus switching the noise will be
                 // bounded by freshEncryptionNoise
@@ -450,7 +450,7 @@ bool ParameterGenerationBGVRNS::ParamsGenBGVRNS(std::shared_ptr<CryptoParameters
         qBound++;
 
     uint32_t auxTowers = 0;
-    if (ksTech == HYBRID) {
+    if (ksTech == HYBRID || ksTech == BATCHED) {
         auto hybridKSInfo =
             CryptoParametersRNS::EstimateLogP(numPartQ, firstModSize, dcrtBits, extraModSize, numPrimes, auxBits, true);
         qBound += std::get<0>(hybridKSInfo);
@@ -479,7 +479,7 @@ bool ParameterGenerationBGVRNS::ParamsGenBGVRNS(std::shared_ptr<CryptoParameters
             newQBound       = std::get<1>(moduliInfo);
             if (multipartyMode == NOISE_FLOODING_MULTIPARTY)
                 newQBound += cryptoParamsBGVRNS->EstimateMultipartyFloodingLogQ();
-            if (ksTech == HYBRID) {
+            if (ksTech == HYBRID || ksTech == BATCHED) {
                 auto hybridKSInfo = CryptoParametersRNS::EstimateLogP(
                     numPartQ, std::log2(moduliQ[0].ConvertToDouble()),
                     (moduliQ.size() > 1) ? std::log2(moduliQ[1].ConvertToDouble()) : 0,
@@ -615,7 +615,7 @@ bool ParameterGenerationBGVRNS::ParamsGenBGVRNS(std::shared_ptr<CryptoParameters
     SecurityLevel stdLevel = cryptoParamsBGVRNS->GetStdLevel();
     if (stdLevel != HEStd_NotSet) {
         uint32_t logActualQ = 0;
-        if (ksTech == HYBRID) {
+        if (ksTech == HYBRID || ksTech == BATCHED) {
             logActualQ = cryptoParamsBGVRNS->GetParamsQP()->GetModulus().GetMSB();
         }
         else {
