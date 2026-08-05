@@ -155,6 +155,17 @@ public:
     // ============================================================
     // End of BFM+25 ThFHE encryption algorithm
     // ============================================================
+
+    // ============================================================
+    // Special-FHE encryption (enforces c0 + c1*s = floor(Q/p)*m + C_dec * e_fresh).
+    // Currently only BFVRNS + shareType == "2adic" is implemented, with C_dec = Delta^2.
+    // ============================================================
+    virtual Ciphertext<Element> SpecialEncrypt(Element plaintext,
+                                               const PublicKey<Element> publicKey,
+                                               const std::string& shareType,
+                                               usint N, usint Threshold) const {
+        OPENFHE_THROW("SpecialEncrypt() not implemented for this scheme.");
+    }
 };
 
 }  // namespace lbcrypto

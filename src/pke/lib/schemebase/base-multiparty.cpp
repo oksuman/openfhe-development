@@ -272,7 +272,8 @@ Ciphertext<Element> MultipartyBase<Element>::GenPartialDec(
     ConstCiphertext<Element> ciphertext,
     const PrivateKey<Element> privateKey,
     bool denomClear,
-    const std::string& shareType, uint32_t N, uint32_t t) const {
+    const std::string& shareType, uint32_t N, uint32_t t,
+    const std::string& BsmDec) const {
     OPENFHE_THROW("GenPartialDec is not implemented for this scheme");
 }
 

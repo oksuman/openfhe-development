@@ -1357,6 +1357,39 @@ public:
     }
     // ============================================================
     // End of BFM+25 ThFHE encryption algorithm
+
+    // ============================================================
+    // Special-FHE encryption (2adic uses C_dec = Delta^2).
+    // ============================================================
+    Ciphertext<Element> SpecialEncrypt(ConstPlaintext& plaintext,
+                                       const PublicKey<Element>& publicKey,
+                                       const std::string& shareType,
+                                       usint N, usint Threshold) const {
+        if (plaintext == nullptr)
+            OPENFHE_THROW("Input plaintext is nullptr");
+        ValidateKey(publicKey);
+
+        Ciphertext<Element> ciphertext =
+            GetScheme()->SpecialEncrypt(plaintext->GetElement<Element>(), publicKey, shareType, N, Threshold);
+
+        if (ciphertext) {
+            ciphertext->SetSlots(plaintext->GetSlots());
+            ciphertext->SetLevel(plaintext->GetLevel());
+            ciphertext->SetNoiseScaleDeg(plaintext->GetNoiseScaleDeg());
+            ciphertext->SetScalingFactor(plaintext->GetScalingFactor());
+            ciphertext->SetScalingFactorInt(plaintext->GetScalingFactorInt());
+            ciphertext->SetEncodingType(plaintext->GetEncodingType());
+        }
+        return ciphertext;
+    }
+    Ciphertext<Element> SpecialEncrypt(const PublicKey<Element>& publicKey,
+                                       ConstPlaintext& plaintext,
+                                       const std::string& shareType,
+                                       usint N, usint Threshold) const {
+        return SpecialEncrypt(plaintext, publicKey, shareType, N, Threshold);
+    }
+    // ============================================================
+    // End of Special-FHE encryption
     // ============================================================
 
 
@@ -3247,13 +3280,18 @@ public:
         return newCiphertextVec;
     }
 
+    // BsmDec: decimal string of the row-specific bounded-uniform coefficient bound
+    //         B_sm.  Empty (default) selects the legacy Discrete Gaussian smudging
+    //         path with sigma = NoiseFlooding::MP_SD_NEW; non-empty triggers the
+    //         coefficient-wise Uniform([-B_sm, B_sm]) sampler.
     Ciphertext<Element> GenPartialDec(ConstCiphertext<Element>& ciphertext,
                                   const PrivateKey<Element> privateKey,
                                   bool denomClear = false,
-                                  const std::string& shareType = "", uint32_t N=0, uint32_t t=0) const {
+                                  const std::string& shareType = "", uint32_t N=0, uint32_t t=0,
+                                  const std::string& BsmDec = "") const {
         ValidateKey(privateKey);
         ValidateCiphertext(ciphertext);
-        return GetScheme()->GenPartialDec(ciphertext, privateKey, denomClear, shareType, N, t);
+        return GetScheme()->GenPartialDec(ciphertext, privateKey, denomClear, shareType, N, t, BsmDec);
     }
 
     /**

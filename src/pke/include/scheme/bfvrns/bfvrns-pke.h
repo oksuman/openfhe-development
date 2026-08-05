@@ -137,6 +137,16 @@ public:
     // End of BFM+25 ThFHE encryption algorithm
     // ============================================================
 
+    // ============================================================
+    // Special-FHE encryption for shareType == "2adic".
+    // Scales e0, e1 by 2^{2 ceil(log2 t)} = Delta^2 so that, paired with
+    // SpecialKeyGen (b = -a*s + Delta^2 * e_pk), the fresh ciphertext
+    // satisfies  c0 + c1*s = floor(Q/p)*m + Delta^2 * e_fresh  (mod Q).
+    // ============================================================
+    Ciphertext<DCRTPoly> SpecialEncrypt(DCRTPoly plaintext,
+                                        const PublicKey<DCRTPoly> publicKey,
+                                        const std::string& shareType,
+                                        usint N, usint Threshold) const override;
 };
 }  // namespace lbcrypto
 

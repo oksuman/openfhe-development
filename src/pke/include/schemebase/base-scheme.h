@@ -219,6 +219,14 @@ public:
         return m_PKE->Encrypt(plaintext, publicKey);
     }
 
+    virtual Ciphertext<Element> SpecialEncrypt(const Element& plaintext,
+                                               const PublicKey<Element> publicKey,
+                                               const std::string& shareType,
+                                               usint N, usint Threshold) const {
+        VerifyPKEEnabled(__func__);
+        return m_PKE->SpecialEncrypt(plaintext, publicKey, shareType, N, Threshold);
+    }
+
     virtual DecryptResult Decrypt(ConstCiphertext<Element>& ciphertext, const PrivateKey<Element> privateKey,
                                   NativePoly* plaintext) const {
         VerifyPKEEnabled(__func__);
@@ -1055,7 +1063,8 @@ public:
     virtual Ciphertext<Element> GenPartialDec(ConstCiphertext<Element>& ciphertext,
                                           const PrivateKey<Element> privateKey,
                                           bool denomClear = false,
-                                          const std::string& shareType = "", uint32_t N=0, uint32_t t=0) const;
+                                          const std::string& shareType = "", uint32_t N=0, uint32_t t=0,
+                                          const std::string& BsmDec = "") const;
 
     virtual DecryptResult MultipartyDecryptFusion(const std::vector<Ciphertext<Element>>& ciphertextVec,
                                                   NativePoly* plaintext) const {

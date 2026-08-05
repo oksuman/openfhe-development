@@ -35,6 +35,7 @@
 #include "cryptocontext.h"
 #include "schemerns/rns-pke.h"
 #include "thfhe-debug.h"
+#include "math/nbtheory-impl.h"   // for uniform BigInteger sampling (rejection PRNG)
 
 #include <memory>
 #include <vector>
@@ -42,6 +43,65 @@
 #include <string>
 
 namespace lbcrypto {
+
+// ============================================================
+// Coefficient-wise uniform hypercube sampler for the smudging noise.
+// Samples n independent signed integers z_j ~ Uniform([-Bsm, Bsm] cap Z) using
+// OpenFHE's Blake2-based Blake2 PRNG (rejection sampling in [0, 2*Bsm+1)),
+// then broadcasts the SAME signed integer to every RNS tower as z_j mod q_k.
+// This is required by Damien et al.'s C4 flooding lemma applied to
+// Construction 4.1: only a single small integer polynomial (equal residue
+// classes across towers) has a coefficient-infinity-norm bound.
+// ============================================================
+static DCRTPoly SampleBoundedUniformDCRT(
+    const std::shared_ptr<ILDCRTParams<BigInteger>>& params,
+    const BigInteger& Bsm) {
+    const usint  ringDim   = params->GetRingDimension();
+    const size_t numTowers = params->GetParams().size();
+    const BigInteger range = (Bsm << 1) + BigInteger(1);   // 2*Bsm + 1 draws
+
+    // Precompute per-tower moduli in both representations.  Without this the
+    // inner coefficient loop would do a BigInteger ctor + two ToString round
+    // trips per coefficient per tower — the dominant cost at large ringDim.
+    std::vector<BigInteger>    qkBig(numTowers);
+    std::vector<NativeInteger> qkNat(numTowers);
+    for (size_t k = 0; k < numTowers; ++k) {
+        qkNat[k] = params->GetParams()[k]->GetModulus();
+        qkBig[k] = BigInteger(qkNat[k].ToString());
+    }
+
+    std::vector<NativePoly> towers;
+    towers.reserve(numTowers);
+    for (size_t k = 0; k < numTowers; ++k) {
+        NativePoly p(params->GetParams()[k], Format::COEFFICIENT, true);
+        towers.push_back(std::move(p));
+    }
+
+    // Sequential coefficient loop (matches the sequential path of OpenFHE's
+    // legacy Discrete Gaussian DCRTPoly constructor at dcrtpoly-impl.h:129, so
+    // sampler-cost comparison against the legacy baseline is fair).  An
+    // OpenMP parallel-for over this loop is safe (per-thread Blake2 PRNG,
+    // disjoint tower slots) but was intentionally omitted for that reason.
+    for (usint j = 0; j < ringDim; ++j) {
+        BigInteger u = RNG<BigInteger>(range);
+        const bool negative = (u < Bsm);
+        BigInteger absZ = negative ? (Bsm - u) : (u - Bsm);
+        for (size_t k = 0; k < numTowers; ++k) {
+            BigInteger rmod = absZ.Mod(qkBig[k]);
+            NativeInteger residue(rmod.ConvertToInt<uint64_t>());
+            if (negative && residue != NativeInteger(0)) {
+                residue = qkNat[k] - residue;
+            }
+            towers[k][j] = residue;
+        }
+    }
+
+    DCRTPoly out(params, Format::COEFFICIENT, true);
+    for (size_t k = 0; k < numTowers; ++k)
+        out.SetElementAtIndex(k, std::move(towers[k]));
+    out.SetFormat(Format::EVALUATION);
+    return out;
+}
 
 Ciphertext<DCRTPoly> MultipartyRNS::MultipartyDecryptLead(ConstCiphertext<DCRTPoly> ciphertext,
                                                           const PrivateKey<DCRTPoly> privateKey) const {
@@ -231,7 +291,8 @@ Ciphertext<DCRTPoly> MultipartyRNS::GenPartialDec(ConstCiphertext<DCRTPoly> ciph
                                                   const PrivateKey<DCRTPoly> privateKey,
                                                   bool denomClear,
                                                   const std::string& shareType,
-                                                  uint32_t N, uint32_t t) const {
+                                                  uint32_t N, uint32_t t,
+                                                  const std::string& BsmDec) const {
     const auto cryptoParams = std::dynamic_pointer_cast<CryptoParametersRNS>(privateKey->GetCryptoParameters());
     const std::vector<DCRTPoly>& cv = ciphertext->GetElements();
     auto s(privateKey->GetPrivateElement());
@@ -273,6 +334,11 @@ Ciphertext<DCRTPoly> MultipartyRNS::GenPartialDec(ConstCiphertext<DCRTPoly> ciph
         auto dgg = cryptoParams->GetFloodingDiscreteGaussianGenerator();
         DCRTPoly e(dgg, cv[0].GetParams(), Format::EVALUATION);
         noise = std::move(e);
+    }
+    else if (!BsmDec.empty()) {
+        // Row-specific bounded-uniform smudging (Damien C4 flooding lemma).
+        BigInteger Bsm(BsmDec);
+        noise = SampleBoundedUniformDCRT(cv[0].GetParams(), Bsm);
     }
     else {
         DggType dgg(NoiseFlooding::MP_SD_NEW);

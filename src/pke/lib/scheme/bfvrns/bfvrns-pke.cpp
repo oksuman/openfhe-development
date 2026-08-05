@@ -104,17 +104,24 @@ KeyPair<DCRTPoly> PKEBFVRNS::KeyGenInternal(CryptoContext<DCRTPoly> cc, bool mak
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-static std::vector<NativeInteger> MakeScalePerTower_2PowT(
-    const std::shared_ptr<ILDCRTParams<BigInteger>>& params, uint64_t T) {
+// Per-tower scale 2^exp mod q_k. Used to enforce C_dec = 2^exp
+// (e.g. Delta^2 = 2^{2 ceil(log2 t)}) across SpecialKeyGen and SpecialEncrypt.
+static std::vector<NativeInteger> MakeScalePerTower_TwoPowE(
+    const std::shared_ptr<ILDCRTParams<BigInteger>>& params, uint64_t exp) {
     const size_t vecSize = params->GetParams().size();
     std::vector<NativeInteger> v(vecSize);
-// Delta = 2^{ceil(log2(T))} for 2-adic secret sharing
-    uint64_t exp = static_cast<uint64_t>(std::ceil(std::log2(static_cast<double>(T))));
     for (size_t k = 0; k < vecSize; ++k) {
         auto qk = params->GetParams()[k]->GetModulus();
-        v[k]    = NativeInteger(2).ModExp(NativeInteger(exp), qk); // 2^{ceil(log2(T))} mod qk
+        v[k]    = NativeInteger(2).ModExp(NativeInteger(exp), qk);
     }
     return v;
+}
+
+// Exponent for the 2-adic Special-FHE error scale.  C_dec = Delta^2 gives
+// the invariant  c0 + c1*s = floor(Q/p)*m + Delta^2 * e_fresh  (mod Q)
+// when both SpecialKeyGen and SpecialEncrypt use it.
+static inline uint64_t SpecialErrorScaleExp2Adic(uint32_t t) {
+    return 2ULL * static_cast<uint64_t>(std::ceil(std::log2(static_cast<double>(t))));
 }
 
 static std::vector<NativeInteger> MakeScalePerTower_FactPow4(
@@ -270,9 +277,12 @@ if (g_thfhe_debug) std::cout << "[DEBUG] KeyGen: secret key dist = UNKNOWN\n";
 
     DCRTPoly eScaled;
     if (shareType == "2adic") {
-        auto scale2Pow = MakeScalePerTower_2PowT(paramsPK, static_cast<uint64_t>(Threshold));
-        eScaled = ScaleNoisePerTower(e, paramsPK, scale2Pow);
-        // PrintDCRTPoly(eScaled, "scaled error in key generation");
+        // Special-FHE invariant: b = -a*s + Delta^2 * e_pk.
+        // The matching e0, e1 scaling in SpecialEncrypt gives
+        //   c0 + c1*s = floor(Q/p)*m + Delta^2 * e_fresh (mod Q).
+        const uint64_t exp2 = SpecialErrorScaleExp2Adic(static_cast<uint32_t>(Threshold));
+        auto scaleD2 = MakeScalePerTower_TwoPowE(paramsPK, exp2);
+        eScaled = ScaleNoisePerTower(e, paramsPK, scaleD2);
     }
     else if (shareType == "shamir") {
         auto scaleFact4 = MakeScalePerTower_FactPow4(paramsPK, static_cast<uint32_t>(N));
@@ -663,5 +673,139 @@ Ciphertext<DCRTPoly> PKEBFVRNS::BFMEncrypt(DCRTPoly ptxt, const PublicKey<DCRTPo
 // End of BFM+25 ThFHE encryption algorithm
 // ============================================================
 
+// ============================================================
+// Special-FHE encryption.
+// Companion to KeyGenInternalSpecial: scales the encryption errors e0, e1
+// by the same C_dec factor used for e_pk so that
+//   c0 + c1*s = floor(Q/p)*m + C_dec * (e_pk*v + e0 + e1*s)  (mod Q).
+// v is sampled from the standard Ternary / Gaussian used by Encrypt.
+// Message insertion follows the unchanged BFV TimesQovert path.
+//
+// Per-shareType C_dec:
+//   "2adic":  C_dec = Delta^2  where Delta = 2^{ceil(log2 t)}
+//   "shamir": C_dec = (N!)^4                        (matches KeyGen's e_pk scaling)
+// ============================================================
+static std::vector<NativeInteger> MakeSpecialEncryptScale(
+    const std::shared_ptr<ILDCRTParams<BigInteger>>& params,
+    const std::string& shareType, uint32_t N, uint32_t Threshold) {
+    if (shareType == "2adic") {
+        return MakeScalePerTower_TwoPowE(params, SpecialErrorScaleExp2Adic(Threshold));
+    }
+    if (shareType == "shamir") {
+        return MakeScalePerTower_FactPow4(params, N);
+    }
+    OPENFHE_THROW("SpecialEncrypt: unsupported shareType = " + shareType);
+}
+
+static std::shared_ptr<std::vector<DCRTPoly>>
+SpecialEncryptZeroCore(
+    const PublicKey<DCRTPoly> publicKey,
+    const std::shared_ptr<ILDCRTParams<BigInteger>> params,
+    const std::string& shareType,
+    uint32_t N, uint32_t Threshold) {
+    const auto cryptoParams = std::dynamic_pointer_cast<CryptoParametersBFVRNS>(publicKey->GetCryptoParameters());
+    const std::vector<DCRTPoly>& pk = publicKey->GetPublicElements();
+    const auto ns   = cryptoParams->GetNoiseScale();
+    const auto& dgg = cryptoParams->GetDiscreteGaussianGenerator();
+    typename DCRTPoly::TugType tug;
+
+    const auto elementParams = (params == nullptr) ? cryptoParams->GetElementParams() : params;
+
+    DCRTPoly v = (cryptoParams->GetSecretKeyDist() == GAUSSIAN)
+                     ? DCRTPoly(dgg, elementParams, Format::EVALUATION)
+                     : DCRTPoly(tug, elementParams, Format::EVALUATION);
+    DCRTPoly e0(dgg, elementParams, Format::EVALUATION);
+    DCRTPoly e1(dgg, elementParams, Format::EVALUATION);
+
+    // Scale e0, e1 by C_dec (shareType-dependent).
+    auto scale = MakeSpecialEncryptScale(elementParams, shareType, N, Threshold);
+    DCRTPoly e0Scaled = ScaleNoisePerTower(e0, elementParams, scale);
+    DCRTPoly e1Scaled = ScaleNoisePerTower(e1, elementParams, scale);
+
+    DebugPrintNorm("SpecialEncrypt: randomness v", v);
+    DebugPrintNorm("SpecialEncrypt: raw e0",       e0);
+    DebugPrintNorm("SpecialEncrypt: raw e1",       e1);
+    DebugPrintNorm("SpecialEncrypt: Cdec * e0",    e0Scaled);
+    DebugPrintNorm("SpecialEncrypt: Cdec * e1",    e1Scaled);
+
+    const uint32_t sizeQ  = pk[0].GetParams()->GetParams().size();
+    const uint32_t sizeQl = elementParams->GetParams().size();
+
+    DCRTPoly c0, c1;
+    if (sizeQl != sizeQ) {
+        DCRTPoly p0 = pk[0].Clone();
+        DCRTPoly p1 = pk[1].Clone();
+        const uint32_t diff = sizeQ - sizeQl;
+        p0.DropLastElements(diff);
+        p1.DropLastElements(diff);
+        c0 = p0 * v + ns * e0Scaled;
+        c1 = p1 * v + ns * e1Scaled;
+    } else {
+        c0 = pk[0] * v + ns * e0Scaled;
+        c1 = pk[1] * v + ns * e1Scaled;
+    }
+
+    DebugPrintNorm("SpecialEncrypt: c0 = b*v + Cdec * e0", c0);
+    DebugPrintNorm("SpecialEncrypt: c1 = a*v + Cdec * e1", c1);
+
+    return std::make_shared<std::vector<DCRTPoly>>(
+        std::initializer_list<DCRTPoly>({std::move(c0), std::move(c1)}));
+}
+
+Ciphertext<DCRTPoly> PKEBFVRNS::SpecialEncrypt(
+    DCRTPoly ptxt, const PublicKey<DCRTPoly> publicKey,
+    const std::string& shareType, usint N, usint Threshold) const {
+    if (shareType != "2adic" && shareType != "shamir")
+        OPENFHE_THROW("PKEBFVRNS::SpecialEncrypt: unsupported shareType = " + shareType);
+
+    Ciphertext<DCRTPoly> ciphertext(std::make_shared<CiphertextImpl<DCRTPoly>>(publicKey));
+    const auto cryptoParams = std::dynamic_pointer_cast<CryptoParametersBFVRNS>(publicKey->GetCryptoParameters());
+
+    const auto elementParams = cryptoParams->GetElementParams();
+    size_t sizeQ             = elementParams->GetParams().size();
+
+    auto encParams = ptxt.GetParams();
+    size_t sizeP   = encParams->GetParams().size();
+    size_t level   = sizeQ - sizeP;
+
+    std::vector<NativeInteger> tInvModq = cryptoParams->GettInvModq();
+    if (cryptoParams->GetEncryptionTechnique() == EXTENDED) {
+        encParams = cryptoParams->GetParamsQr();
+        ptxt.SetFormat(Format::COEFFICIENT);
+        Poly bigPtxt = ptxt.CRTInterpolate();
+        DCRTPoly plain(bigPtxt, encParams);
+        ptxt     = plain;
+        tInvModq = cryptoParams->GettInvModqr();
+    }
+    ptxt.SetFormat(Format::COEFFICIENT);
+
+    auto ba = SpecialEncryptZeroCore(publicKey, encParams, shareType,
+                                     static_cast<uint32_t>(N), static_cast<uint32_t>(Threshold));
+
+    NativeInteger NegQModt       = cryptoParams->GetNegQModt(level);
+    NativeInteger NegQModtPrecon = cryptoParams->GetNegQModtPrecon(level);
+    if (cryptoParams->GetEncryptionTechnique() == EXTENDED) {
+        NegQModt       = cryptoParams->GetNegQrModt();
+        NegQModtPrecon = cryptoParams->GetNegQrModtPrecon();
+    }
+
+    const NativeInteger t = cryptoParams->GetPlaintextModulus();
+    ptxt.TimesQovert(encParams, tInvModq, t, NegQModt, NegQModtPrecon);
+    ptxt.SetFormat(Format::EVALUATION);
+    (*ba)[0] += ptxt;
+
+    (*ba)[0].SetFormat(Format::COEFFICIENT);
+    (*ba)[1].SetFormat(Format::COEFFICIENT);
+    if (cryptoParams->GetEncryptionTechnique() == EXTENDED) {
+        (*ba)[0].ScaleAndRoundPOverQ(elementParams, cryptoParams->GetrInvModq());
+        (*ba)[1].ScaleAndRoundPOverQ(elementParams, cryptoParams->GetrInvModq());
+    }
+    (*ba)[0].SetFormat(Format::EVALUATION);
+    (*ba)[1].SetFormat(Format::EVALUATION);
+
+    ciphertext->SetElements({std::move((*ba)[0]), std::move((*ba)[1])});
+    ciphertext->SetNoiseScaleDeg(1);
+    return ciphertext;
+}
 
 }  // namespace lbcrypto
